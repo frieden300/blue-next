@@ -1,0 +1,15 @@
+# 1. Combine V2 and V3 into V2Pds_s36cV3Pds.mp4
+ffmpeg -y -i V2Pds_s36.mp4 -i V3Pds.mp4 -filter_complex "[0:v][1:v]concat=n=2:v=1:a=0[v]" -map "[v]" -an -c:v libx264 -preset slow -tune fastdecode -g 1 -keyint_min 1 -bf 0 -crf 20 -pix_fmt yuv420p -movflags +faststart V2Pds_s36cV3Pds.mp4
+
+# 2. Shorten and optimize V7
+ffmpeg -y -i V7Pds.mp4 -vf "setpts=0.75*PTS" -r 24 -an -c:v libx264 -preset slow -tune fastdecode -g 1 -keyint_min 1 -bf 0 -crf 20 -pix_fmt yuv420p -movflags +faststart opt_V7Pds.mp4
+
+# 3. Optimize remaining Passage videos
+@('V5.00Pds.mp4', 'V5.47Pds_s27.mp4') | ForEach-Object {
+    ffmpeg -y -i $_ -an -c:v libx264 -preset slow -tune fastdecode -g 1 -keyint_min 1 -bf 0 -crf 20 -pix_fmt yuv420p -movflags +faststart "opt_$_"
+}
+
+# 4. Optimize Loop videos
+@('V1Lrus_s36.mp4', 'V4Lds.mp4', 'V5.14Lds.mp4', 'V6Lds_s27.mp4', 'V8Lds_b.mp4') | ForEach-Object {
+    ffmpeg -y -i $_ -an -c:v libx264 -preset medium -profile:v high -pix_fmt yuv420p -r 24 -g 48 -keyint_min 48 -crf 23 -maxrate 2.5M -bufsize 5M -movflags +faststart "opt_$_"
+}

@@ -1,0 +1,88 @@
+/* ===================================================
+   BLUE — Global Design Tokens & Base Styles
+   =================================================== */
+
+:root {
+  /* Brand palette (matches scrollytelling.css) */
+  --blue:       #82d9ed;
+  --cyan-glow:  #1786bd;
+  --white:      #f2f7f8;
+  --muted:      rgba(232, 244, 248, 0.68);
+  --navy:       #03111c;
+  --navy-deep:  #03070f;
+  --surface:    rgba(5, 24, 36, 0.60);
+  --border:     rgba(216, 247, 255, 0.18);
+  --border-mid: rgba(216, 247, 255, 0.32);
+
+  /* Typography */
+  --font-sans:  Inter, "Segoe UI", Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+
+  /* Layout */
+  --page-max: 1280px;
+  --page-pad: clamp(20px, 5vw, 64px);
+  --header-h: 64px;
+}
+
+/* Base reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  height: 100%;
+  color-scheme: dark;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  background: var(--navy);
+  color: var(--white);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img, video {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Custom scrollbar — thin, navy/cyan */
+::-webkit-scrollbar          { width: 6px; }
+::-webkit-scrollbar-track    { background: var(--navy-deep); }
+::-webkit-scrollbar-thumb    { background: #1b3d52; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+

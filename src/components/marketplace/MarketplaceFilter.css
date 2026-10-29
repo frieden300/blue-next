@@ -1,0 +1,104 @@
+.marketplace-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.marketplace-search-form {
+  display: flex;
+  gap: 10px;
+  max-width: 540px;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(5, 24, 36, 0.65);
+  color: var(--white);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--blue);
+  background: rgba(5, 24, 36, 0.9);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+}
+
+.search-submit-btn {
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border-mid);
+  background: rgba(130, 217, 237, 0.1);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.search-submit-btn:hover {
+  background: var(--blue);
+  color: var(--navy);
+  border-color: var(--blue);
+}
+
+.filter-chips-scroll {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-chip {
+  appearance: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font: 500 12px/1 var(--font-sans);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.filter-chip:hover {
+  border-color: rgba(130, 217, 237, 0.4);
+  color: var(--white);
+  background: rgba(130, 217, 237, 0.06);
+}
+
+.filter-chip.active {
+  border-color: var(--blue);
+  background: rgba(130, 217, 237, 0.12);
+  color: var(--blue);
+}

@@ -1,0 +1,359 @@
+/* ===================================================
+   BLUE — /bookings Page Styles
+   =================================================== */
+
+.bookings-main {
+  min-height: calc(100vh - var(--header-h));
+}
+
+.bookings-page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--page-pad) 100px;
+  width: 100%;
+}
+
+/* ---- Hero ---- */
+.bookings-hero {
+  padding: clamp(48px, 8vw, 88px) 0 40px;
+}
+.bookings-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--blue);
+  margin-bottom: 16px;
+}
+.bookings-heading {
+  font-size: clamp(32px, 5vw, 64px);
+  font-weight: 500;
+  line-height: 0.97;
+  letter-spacing: -0.05em;
+  color: var(--white);
+  margin-bottom: 16px;
+}
+.bookings-heading em {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-style: italic;
+}
+.bookings-sub {
+  max-width: 480px;
+  font-size: clamp(13px, 1.1vw, 15px);
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+/* ---- Gateway (logged out) ---- */
+.bookings-gateway {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: clamp(80px, 12vw, 140px) var(--page-pad);
+  max-width: 480px;
+  margin: 0 auto;
+  gap: 16px;
+}
+.bookings-gateway-icon { font-size: 60px; opacity: 0.7; }
+.bookings-auth-btns {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+.bookings-btn-primary {
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: rgba(130, 217, 237, 0.15);
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.bookings-btn-primary:hover {
+  background: rgba(130, 217, 237, 0.25);
+  box-shadow: 0 0 20px rgba(130,217,237,0.25);
+}
+.bookings-btn-secondary {
+  padding: 12px 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border-mid);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.bookings-btn-secondary:hover {
+  border-color: var(--blue);
+  color: var(--white);
+}
+
+/* ---- Empty state ---- */
+.bookings-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: clamp(40px, 8vw, 80px) 0;
+  gap: 16px;
+}
+.bookings-empty-icon { font-size: 56px; opacity: 0.7; }
+.bookings-empty-title {
+  font-size: clamp(20px, 3vw, 30px);
+  font-weight: 500;
+  color: var(--white);
+  letter-spacing: -0.03em;
+}
+.bookings-empty-sub {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.75;
+  max-width: 400px;
+}
+.bookings-empty-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---- Sections ---- */
+.bookings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+.bookings-section { display: flex; flex-direction: column; gap: 20px; }
+.bookings-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bookings-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* ---- Booking card ---- */
+.booking-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(5, 24, 36, 0.55);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.booking-card:hover {
+  border-color: rgba(130, 217, 237, 0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.booking-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.booking-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 2px;
+}
+.booking-card-ref {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+  font-family: monospace;
+}
+.rental-card-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+.booking-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.status-confirmed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+.status-cancelled {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Order items */
+.booking-items-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.booking-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.booking-item-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.booking-item-info { flex: 1; }
+.booking-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 2px;
+}
+.booking-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.booking-item-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+  white-space: nowrap;
+}
+
+/* Rental details grid */
+.rental-booking-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rental-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rental-detail-row span:last-child { color: var(--white); }
+.rental-detail-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.rental-detail-total { font-size: 14px; }
+.rental-detail-total span { color: var(--white); }
+.rental-detail-total strong { font-size: 16px; color: var(--white); }
+
+/* Card footer */
+.booking-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.booking-date, .booking-ref-small {
+  font-size: 11px;
+  color: rgba(232,244,248,0.4);
+}
+.booking-total {
+  font-size: 13px;
+  color: var(--muted);
+}
+.booking-total strong { color: var(--white); }
+
+/* Rental confirmed card (in rental form) */
+.rental-confirmed-card {
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 20px;
+  background: rgba(34, 197, 94, 0.05);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.rental-confirmed-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rental-confirmed-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #86efac;
+}
+.rental-confirmed-details {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rental-conf-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+.rental-conf-row span:last-child { color: var(--white); }
+.rental-conf-divider { height: 1px; background: rgba(34,197,94,0.2); margin: 4px 0; }
+.rental-conf-total { font-size: 14px; }
+.rental-conf-total span { color: var(--white); }
+.rental-conf-total strong { color: #86efac; font-size: 16px; }
+.rental-conf-ref {
+  font-size: 11px;
+  color: var(--muted);
+}
+.rental-conf-ref code { color: var(--blue); font-size: 10px; }
+.rental-conf-link {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  transition: opacity 0.2s;
+}
+.rental-conf-link:hover { opacity: 0.8; }
+
+/* Rental date error */
+.rental-date-error {
+  font-size: 12px;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+  .bookings-list { grid-template-columns: 1fr; }
+}
