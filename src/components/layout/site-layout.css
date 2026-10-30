@@ -146,9 +146,13 @@
 
 /* ---- Footer ---- */
 .site-footer {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
   border-top: 1px solid var(--border);
   background: rgba(3, 7, 15, 0.8);
   padding: 48px 0 32px;
+  box-sizing: border-box;
 }
 
 .site-footer-inner {

@@ -109,7 +109,8 @@ body {
     animation-delay: var(--delay)
 }
 
-header {
+.experience header,
+.scrolly-header {
     position: absolute;
     z-index: 5;
     top: 0;
@@ -136,7 +137,8 @@ header {
 
 .topnote,
 .edition,
-footer,
+.experience footer,
+.scrolly-footer,
 .side-note,
 .copy>p:first-child {
     font-size: 9px;
@@ -199,7 +201,7 @@ footer,
     margin: 0 0 22px
 }
 
-h1 {
+.copy h1 {
     font-size: clamp(42px, 7.2vw, 106px);
     line-height: .98;
     letter-spacing: -.065em;
@@ -207,7 +209,7 @@ h1 {
     margin: 0
 }
 
-h1 em {
+.copy h1 em {
     font-family: Georgia, "Times New Roman", serif;
     font-weight: 400;
     letter-spacing: -.055em
@@ -221,7 +223,8 @@ h1 em {
     color: var(--muted)
 }
 
-footer {
+.experience footer,
+.scrolly-footer {
     position: absolute;
     z-index: 5;
     left: 4.2vw;
@@ -542,7 +545,8 @@ footer {
 }
 
 @media(max-width:700px) {
-    header {
+    .experience header,
+    .scrolly-header {
         padding: 12px 16px
     }
 
@@ -560,7 +564,7 @@ footer {
         top: 48%
     }
 
-    h1 {
+    .copy h1 {
         font-size: clamp(42px, 12vw, 72px)
     }
 
@@ -586,7 +590,8 @@ footer {
         display: none
     }
 
-    footer {
+    .experience footer,
+    .scrolly-footer {
         left: 22px;
         right: 22px;
         bottom: 22px;
@@ -928,7 +933,8 @@ footer {
 }
 
 @media(max-width:860px) {
-    header {
+    .experience header,
+    .scrolly-header {
         gap: 10px
     }
 

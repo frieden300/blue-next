@@ -157,7 +157,7 @@ export default function Scrollytelling() {
           <div className="particles" id="particles" />
         </div>
 
-        <header>
+        <header className="scrolly-header">
           <div className="brand-cluster">
             <div ref={menuRef} className={`site-menu ${menuOpen ? "is-open" : ""}`}>
               <button
@@ -209,7 +209,7 @@ export default function Scrollytelling() {
           <p id="description">A journey from the edge of our atmosphere into the quiet depths of the ocean.</p>
         </section>
 
-        <footer>
+        <footer className="scrolly-footer">
           <div className="scroll-prompt" id="scrollPrompt" role="region" aria-label="Scroll to descend prompt">
             <div className="scroll-prompt-cue" aria-hidden="true">
               <div className="scroll-mouse">

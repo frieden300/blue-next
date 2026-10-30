@@ -11,31 +11,10 @@ export const metadata = {
   title: "Gear Marketplace — BLUE",
   description: "Browse certified marine and diving equipment for purchase from authorized expedition partners.",
 };
+import GearCard from "@/components/marketplace/cards/GearCard";
+import type { GearListing, ListingImage, PartnerProfile } from "@/types/marketplace";
 
-interface ListingImage {
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
-
-interface PartnerProfile {
-  business_name: string;
-  location: string | null;
-  verified: boolean;
-}
-
-interface GearListing {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  price_from: number;
-  status: string;
-  stock_count?: number;
-  created_at: string;
-  partner_profiles?: PartnerProfile | null;
-  listing_images?: ListingImage[];
-}
+export type { GearListing, ListingImage, PartnerProfile };
 
 import { GEAR_PAGE_CATEGORIES } from "@/lib/constants/marketplace";
 
@@ -207,107 +186,9 @@ async function GearGrid(props: {
       </div>
 
       <div className="gear-grid">
-        {(listings as unknown as GearListing[]).map((item) => {
-          const sortedImages = item.listing_images?.sort(
-            (a, b) => a.sort_order - b.sort_order
-          );
-          const mainImage = sortedImages?.[0];
-          const stock = item.stock_count ?? 10;
-          const isSoldOut = stock <= 0;
-          const isLowStock = stock > 0 && stock <= 3;
-
-          return (
-            <article key={item.id} className="gear-card" style={isSoldOut ? { opacity: 0.85 } : undefined}>
-              <Link
-                href={`/gear/${item.id}`}
-                className="gear-card-img-wrap"
-                style={{ display: "block", cursor: "pointer" }}
-                aria-label={`View details for ${item.title}`}
-              >
-                {mainImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={mainImage.url}
-                    alt={mainImage.alt_text || item.title}
-                    className="gear-card-img"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="gear-card-img-placeholder" aria-hidden="true">
-                    🤿
-                  </div>
-                )}
-
-                {isSoldOut ? (
-                  <span
-                    className="gear-card-tag"
-                    style={{ background: "rgba(220, 38, 38, 0.9)", color: "#fff" }}
-                  >
-                    Sold Out
-                  </span>
-                ) : isLowStock ? (
-                  <span
-                    className="gear-card-tag"
-                    style={{ background: "rgba(217, 119, 6, 0.9)", color: "#fff" }}
-                  >
-                    Only {stock} Left
-                  </span>
-                ) : (
-                  <span className="gear-card-tag">In Stock</span>
-                )}
-
-                {item.partner_profiles?.business_name && (
-                  <span className="gear-card-partner-badge">
-                    {item.partner_profiles.business_name}
-                  </span>
-                )}
-              </Link>
-
-              <div className="gear-card-body">
-                <div className="gear-card-cat-row">
-                  <span
-                    className="gear-card-cat"
-                    style={
-                      isSoldOut
-                        ? { color: "#f87171" }
-                        : isLowStock
-                        ? { color: "#fbbf24" }
-                        : { color: "#34d399" }
-                    }
-                  >
-                    {isSoldOut
-                      ? "✕ Sold Out"
-                      : isLowStock
-                      ? `🔥 Only ${stock} left`
-                      : `✓ In Stock (${stock})`}
-                  </span>
-                  {item.location && (
-                    <span className="gear-card-location">{item.location}</span>
-                  )}
-                </div>
-
-                <h2 className="gear-card-title">{item.title}</h2>
-
-                {item.description && (
-                  <p className="gear-card-desc">{item.description}</p>
-                )}
-
-                <div className="gear-card-footer">
-                  <div>
-                    <p className="gear-card-price-label">Price</p>
-                    <p className="gear-card-price">
-                      ₹{Number(item.price_from).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-
-                  <Link href={`/gear/${item.id}`} className="gear-card-view-btn">
-                    {isSoldOut ? "Details →" : "Buy Now →"}
-                  </Link>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+        {(listings as unknown as GearListing[]).map((item) => (
+          <GearCard key={item.id} item={item} />
+        ))}
       </div>
     </>
   );

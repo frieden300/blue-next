@@ -11,32 +11,10 @@ export const metadata = {
   title: "Gear Rentals — BLUE",
   description: "Rent certified diving kits, cylinder sets, cameras, and marine gear for your ocean expeditions.",
 };
+import RentalCard from "@/components/marketplace/cards/RentalCard";
+import type { RentalListing, ListingImage, PartnerProfile } from "@/types/marketplace";
 
-interface ListingImage {
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
-
-interface PartnerProfile {
-  business_name: string;
-  location: string | null;
-  verified: boolean;
-}
-
-interface RentalListing {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  price_from: number;
-  duration_hours: number | null;
-  status: string;
-  inventory_count?: number;
-  created_at: string;
-  partner_profiles?: PartnerProfile | null;
-  listing_images?: ListingImage[];
-}
+export type { RentalListing, ListingImage, PartnerProfile };
 
 import { RENTAL_PAGE_CATEGORIES } from "@/lib/constants/marketplace";
 
@@ -209,76 +187,9 @@ async function RentalsGrid(props: {
       </div>
 
       <div className="rentals-grid">
-        {(listings as unknown as RentalListing[]).map((item) => {
-          const sortedImages = item.listing_images?.sort(
-            (a, b) => a.sort_order - b.sort_order
-          );
-          const mainImage = sortedImages?.[0];
-
-          return (
-            <article key={item.id} className="rental-card">
-              <Link
-                href={`/rentals/${item.id}`}
-                className="rental-card-img-wrap"
-                style={{ display: "block", cursor: "pointer" }}
-                aria-label={`Reserve ${item.title}`}
-              >
-                {mainImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={mainImage.url}
-                    alt={mainImage.alt_text || item.title}
-                    className="rental-card-img"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="rental-card-img-placeholder" aria-hidden="true">
-                    ⚓
-                  </div>
-                )}
-
-                <span className="rental-card-tag">Rental</span>
-
-                {item.partner_profiles?.business_name && (
-                  <span className="rental-card-partner-badge">
-                    {item.partner_profiles.business_name}
-                  </span>
-                )}
-              </Link>
-
-              <div className="rental-card-body">
-                <div className="rental-card-cat-row">
-                  <span className="rental-card-cat">
-                    Rental &bull; {item.inventory_count ?? 5} units in fleet
-                  </span>
-                  {item.location && (
-                    <span className="rental-card-location">{item.location}</span>
-                  )}
-                </div>
-
-                <h2 className="rental-card-title">{item.title}</h2>
-
-                {item.description && (
-                  <p className="rental-card-desc">{item.description}</p>
-                )}
-
-                <div className="rental-card-footer">
-                  <div>
-                    <p className="rental-card-rate-label">Daily Rate</p>
-                    <p className="rental-card-rate">
-                      ₹{Number(item.price_from).toLocaleString("en-IN")}{" "}
-                      <span>/ day</span>
-                    </p>
-                  </div>
-
-                  <Link href={`/rentals/${item.id}`} className="rental-card-view-btn">
-                    Reserve &rarr;
-                  </Link>
-                </div>
-              </div>
-            </article>
-          );
-        })}
+        {(listings as unknown as RentalListing[]).map((item) => (
+          <RentalCard key={item.id} item={item} />
+        ))}
       </div>
     </>
   );

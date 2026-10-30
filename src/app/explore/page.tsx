@@ -12,25 +12,10 @@ export const metadata = {
     "Discover scuba diving, snorkeling, boat tours, and guided marine experiences with certified operators in India.",
 };
 
-/* ── Types ────────────────────────────────────────────────────── */
-interface ListingImage {
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
+import ExperienceCard from "@/components/marketplace/cards/ExperienceCard";
+import type { Experience, ListingImage } from "@/types/marketplace";
 
-export interface Experience {
-  id: string;
-  title: string;
-  category: string;
-  description: string | null;
-  location: string | null;
-  price_from: number;
-  duration_hours: number | null;
-  difficulty: string | null;
-  status: string;
-  listing_images?: ListingImage[];
-}
+export type { Experience, ListingImage };
 
 const CATEGORIES = [
   { value: "all",         label: "All Experiences" },
@@ -211,82 +196,6 @@ async function ExploreListings(props: {
         ))}
       </div>
     </>
-  );
-}
-
-/* ── Card ─────────────────────────────────────────────────────── */
-function ExperienceCard({ exp }: { exp: Experience }) {
-  const sorted = exp.listing_images?.slice().sort((a, b) => a.sort_order - b.sort_order);
-  const img = sorted?.[0];
-
-  const durationLabel = exp.duration_hours
-    ? exp.duration_hours < 1
-      ? `${exp.duration_hours * 60} min`
-      : exp.duration_hours === 1
-      ? "1 hr"
-      : `${exp.duration_hours} hrs`
-    : null;
-
-  const catLabel = CATEGORY_LABELS[exp.category] ?? exp.category;
-
-  return (
-    <article className="exp-card">
-      {/* Image */}
-      <Link
-        href={`/explore/${exp.id}`}
-        className="exp-card-img-wrap"
-        style={{ display: "block", cursor: "pointer" }}
-        aria-label={`View details for ${exp.title}`}
-      >
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img.url}
-            alt={img.alt_text || exp.title}
-            className="exp-card-img"
-            loading="lazy"
-          />
-        ) : (
-          <div className="exp-card-img-placeholder" aria-hidden="true">🌊</div>
-        )}
-
-        {exp.difficulty && (
-          <span className={`difficulty-badge difficulty-${exp.difficulty}`}>
-            {exp.difficulty.charAt(0).toUpperCase() + exp.difficulty.slice(1)}
-          </span>
-        )}
-        <span className="exp-cat-pill">{catLabel}</span>
-      </Link>
-
-      {/* Body */}
-      <div className="exp-card-body">
-        <h2 className="exp-card-title">{exp.title}</h2>
-
-        {exp.location && (
-          <p className="exp-card-location">
-            <span aria-hidden="true">📍</span> {exp.location}
-          </p>
-        )}
-
-        {exp.description && (
-          <p className="exp-card-desc">{exp.description}</p>
-        )}
-
-        <div className="exp-card-meta">
-          {durationLabel && <span>⏱ {durationLabel}</span>}
-        </div>
-
-        <div className="exp-card-footer">
-          <p className="exp-card-price">
-            <span className="price-from">From </span>
-            <strong>₹{Number(exp.price_from).toLocaleString("en-IN")}</strong>
-          </p>
-          <Link href={`/explore/${exp.id}`} className="exp-card-cta">
-            View Experience →
-          </Link>
-        </div>
-      </div>
-    </article>
   );
 }
 

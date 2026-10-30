@@ -57,6 +57,15 @@ export const SUBCAT_LABEL: Record<string, string> = {
   safety_lights: "Safety & Lights",
 };
 
+export const EXPERIENCE_CATEGORY_LABELS: Record<string, string> = {
+  diving: "Scuba Diving",
+  snorkeling: "Snorkeling",
+  boat_tour: "Boat Tour",
+  guided: "Guided Experience",
+};
+
+export const CATEGORY_LABELS = EXPERIENCE_CATEGORY_LABELS;
+
 /**
  * Normalizes legacy, database, or alias subcategory strings to the canonical subcategory value.
  */
