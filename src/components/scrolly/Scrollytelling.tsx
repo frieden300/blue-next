@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import Script from "next/script";
 import "./scrollytelling.css";
 
@@ -171,19 +172,19 @@ export default function Scrollytelling() {
               </button>
               <div className="site-menu-panel">
                 <p className="site-menu-kicker">DISCOVER BLUE</p>
-                <a href="/explore" onClick={() => setMenuOpen(false)}><span>01</span><strong>Explore</strong><small>Ocean experiences</small></a>
-                <a href="/gear" onClick={() => setMenuOpen(false)}><span>02</span><strong>Gear</strong><small>Equipment marketplace</small></a>
-                <a href="/rentals" onClick={() => setMenuOpen(false)}><span>03</span><strong>Rentals</strong><small>Gear for your journey</small></a>
-                <a href="/bookings" onClick={() => setMenuOpen(false)}><span>04</span><strong>My bookings</strong><small>Your planned adventures</small></a>
+                <Link href="/explore" onClick={() => setMenuOpen(false)}><span>01</span><strong>Explore</strong><small>Ocean experiences</small></Link>
+                <Link href="/gear" onClick={() => setMenuOpen(false)}><span>02</span><strong>Gear</strong><small>Equipment marketplace</small></Link>
+                <Link href="/rentals" onClick={() => setMenuOpen(false)}><span>03</span><strong>Rentals</strong><small>Gear for your journey</small></Link>
+                <Link href="/bookings" onClick={() => setMenuOpen(false)}><span>04</span><strong>My bookings</strong><small>Your planned adventures</small></Link>
               </div>
             </div>
-            <a className="logo" href="/" aria-label="Blue home">BL<span>U</span>E<span className="dot">.</span></a>
+            <Link className="logo" href="/" aria-label="Blue home">BL<span>U</span>E<span className="dot">.</span></Link>
           </div>
           <div className="topnote">A JOURNEY INTO THE OCEAN</div>
           <div className="edition">BLUE JOURNEY / 01—07<i /></div>
         </header>
 
-        <a className="journey-cta is-visible" id="journeyCta" href="/explore" aria-label="Explore the BLUE">
+        <Link className="journey-cta is-visible" id="journeyCta" href="/explore" aria-label="Explore the BLUE">
           <div className="journey-cta-bob">
             <div className="journey-cta-card">
               <span className="cta-glass-sheen" aria-hidden="true" />
@@ -200,7 +201,7 @@ export default function Scrollytelling() {
               <span className="journey-cta-arrow" aria-hidden="true">↗</span>
             </div>
           </div>
-        </a>
+        </Link>
 
         <section className="copy" aria-live="polite">
           <p id="eyebrow">01 / THE BEGINNING</p>
@@ -241,7 +242,15 @@ export default function Scrollytelling() {
         <div className="loading" id="loading"><b>B.</b><span>PREPARING YOUR DESCENT</span></div>
         <div className="side-note">AMBIENT SOUND · TOGGLE ANYTIME</div>
       </main>
-      <Script src="/assets/scrollytelling.js?v=20261029" strategy="afterInteractive" />
+      <Script
+        src="/assets/scrollytelling.js?v=20261030b"
+        strategy="afterInteractive"
+        onLoad={() => {
+          if (typeof (window as unknown as { __blueScrollyInit?: () => void }).__blueScrollyInit === "function") {
+            (window as unknown as { __blueScrollyInit: () => void }).__blueScrollyInit();
+          }
+        }}
+      />
     </>
   );
 }

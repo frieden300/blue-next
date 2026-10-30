@@ -147,12 +147,8 @@ async function BookingsContent() {
         <p className="bookings-kicker">MY ACCOUNT — BLUE</p>
         <h1 className="bookings-heading">My <em>Bookings</em></h1>
         <p className="bookings-sub">
-          Your confirmed demo orders and rental reservations.
+          Your confirmed orders and rental reservations.
         </p>
-        <div className="demo-badge-bar" style={{ marginTop: "8px" }}>
-          <span className="demo-dot" aria-hidden="true" />
-          <span>Academic Demonstration &bull; No payments processed</span>
-        </div>
       </div>
 
       {!hasAny ? (

@@ -1,7 +1,267 @@
 (() => {
     "use strict";
-    // Custom virtual scrolling: the browser's scrollbar is not used.
-    // All filenames below match the user's master folder exactly.
+
+    // ─── AUDIO MANAGER ───────────────────────────────────────────────────────
+    const SEGMENT_AUDIO = {
+        "V4Lds": {
+            src: "/assets/audio/V4LA.mp3",
+            sync: true
+        },
+        "V5.14Lds": {
+            src: "/assets/audio/V5and8LA.mp3",
+            sync: false
+        },
+        "V6Lds_s27": {
+            src: "/assets/audio/V6LA.mp3",
+            sync: true
+        },
+        "V8Lds_b": {
+            src: "/assets/audio/V5and8LA.mp3",
+            sync: false
+        },
+    };
+
+    const FADE_S = 0.55;
+    const BG_VOL = 0.18;
+    const SCENE_VOL = 0.82;
+    const DUCK_VOL = 0.25;
+    const SCENE_IDLE_MS = 350;
+
+    const audioMgr = (() => {
+        let ctx = null;
+        let unlocked = false;
+        let sceneTrack = null;
+        let pendingKey = null;
+        let duckTimer = null;
+        let isDucked = false;
+        const bufCache = Object.create(null);
+
+        function getCtx() {
+            if (!ctx || ctx.state === "closed") {
+                ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return ctx;
+        }
+
+        function fetchBuf(src) {
+            if (bufCache[src]) return bufCache[src];
+            bufCache[src] = fetch(src).then(r => r.arrayBuffer()).then(ab => getCtx().decodeAudioData(ab));
+            return bufCache[src];
+        }
+
+        function ramp(gainNode, toVal, durationS) {
+            if (!ctx || ctx.state === "closed") return;
+            const ac = getCtx();
+            gainNode.gain.cancelScheduledValues(ac.currentTime);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, ac.currentTime);
+            gainNode.gain.linearRampToValueAtTime(toVal, ac.currentTime + durationS);
+        }
+
+        function makeLoop(buf, gainNode, startOffset) {
+            const ac = getCtx();
+            const src = ac.createBufferSource();
+            src.buffer = buf;
+            src.loop = true;
+            src.connect(gainNode);
+            src.start(0, startOffset % buf.duration);
+            return src;
+        }
+
+        function makeLoopTracked(buf, gainNode, startOffset) {
+            const ac = getCtx();
+            const src = ac.createBufferSource();
+            src.buffer = buf;
+            src.loop = true;
+            src.connect(gainNode);
+            src.start(0, startOffset % buf.duration);
+            return src;
+        }
+
+        function stopScene(cb) {
+            if (!sceneTrack) {
+                if (cb) cb();
+                return;
+            }
+            const old = sceneTrack;
+            sceneTrack = null;
+            if (ctx && ctx.state !== "closed" && old.gain) {
+                ramp(old.gain, 0, FADE_S);
+            }
+            setTimeout(() => {
+                try {
+                    if (old.src) old.src.stop();
+                } catch (_) { }
+                if (cb) cb();
+            }, FADE_S * 1000 + 50);
+        }
+
+        function startScene(key, videoEl) {
+            const def = SEGMENT_AUDIO[key];
+            if (!def) return;
+            fetchBuf(def.src).then(buf => {
+                if (pendingKey !== key) return;
+                const ac = getCtx();
+                if (!ac || ac.state === "closed") return;
+                const gain = ac.createGain();
+                gain.gain.setValueAtTime(0, ac.currentTime);
+                gain.connect(ac.destination);
+                let offset = 0;
+                if (def.sync && videoEl && Number.isFinite(videoEl.currentTime)) {
+                    offset = videoEl.currentTime % buf.duration;
+                }
+                const src = makeLoop(buf, gain, offset);
+                sceneTrack = {
+                    buf,
+                    src,
+                    gain,
+                    key,
+                    def
+                };
+                ramp(gain, isDucked ? DUCK_VOL : SCENE_VOL, FADE_S);
+            }).catch(() => { });
+        }
+
+        function onSegment(segmentFileKey, videoEl) {
+            if (!unlocked) return;
+            const key = segmentFileKey.replace(/\.mp4$/i, "").split("/").pop().replace(/^.*\//, "");
+            pendingKey = key;
+            if (sceneTrack && sceneTrack.key === key) return;
+            stopScene(() => {
+                if (pendingKey === key) startScene(key, videoEl);
+            });
+        }
+
+        let lastSyncCheck = 0;
+
+        function syncWatchdog(videoEl) {
+            if (!sceneTrack || !sceneTrack.def.sync || !videoEl) return;
+            if (!Number.isFinite(videoEl.currentTime) || !videoEl.duration) return;
+            const now = performance.now();
+            if (now - lastSyncCheck < 1500) return;
+            lastSyncCheck = now;
+            const ac = getCtx();
+            if (!ac || ac.state === "closed") return;
+            const buf = sceneTrack.buf;
+            if (sceneTrack._startedAtAcTime !== undefined) {
+                const elapsed = ac.currentTime - sceneTrack._startedAtAcTime;
+                const audioPhase = (sceneTrack._startOffset + elapsed) % buf.duration;
+                const videoPhase = videoEl.currentTime % buf.duration;
+                const drift = Math.abs(audioPhase - videoPhase);
+                if (drift > 0.12) {
+                    try {
+                        sceneTrack.src.stop();
+                    } catch (_) { }
+                    const gain = sceneTrack.gain;
+                    const offset = videoEl.currentTime % buf.duration;
+                    const src = makeLoop(buf, gain, offset);
+                    sceneTrack.src = src;
+                    sceneTrack._startedAtAcTime = ac.currentTime;
+                    sceneTrack._startOffset = offset;
+                }
+            }
+        }
+
+        function onLoopRestart() {
+            if (!sceneTrack || !sceneTrack.def.sync) return;
+            const buf = sceneTrack.buf;
+            const gain = sceneTrack.gain;
+            try {
+                sceneTrack.src.stop();
+            } catch (_) { }
+            const ac = getCtx();
+            if (!ac || ac.state === "closed") return;
+            const src = makeLoopTracked(buf, gain, 0);
+            sceneTrack.src = src;
+            sceneTrack._startedAtAcTime = ac.currentTime;
+            sceneTrack._startOffset = 0;
+        }
+
+        function duck() {
+            if (!sceneTrack) return;
+            if (isDucked) return;
+            isDucked = true;
+            ramp(sceneTrack.gain, DUCK_VOL, 0.15);
+            if (duckTimer) clearTimeout(duckTimer);
+        }
+
+        function unduck() {
+            if (!isDucked) return;
+            isDucked = false;
+            if (sceneTrack) ramp(sceneTrack.gain, SCENE_VOL, 0.4);
+        }
+
+        function scheduledUnduck() {
+            if (duckTimer) clearTimeout(duckTimer);
+            duckTimer = setTimeout(unduck, SCENE_IDLE_MS);
+        }
+
+        function unlock() {
+            if (unlocked) return;
+            unlocked = true;
+            getCtx().resume().then(() => {
+                if (typeof segments !== "undefined" && typeof activeSegment !== "undefined") {
+                    const seg = segments[activeSegment];
+                    if (seg && typeof videos !== "undefined" && videos[activeVideo]) {
+                        onSegment(seg.file, videos[activeVideo]);
+                    }
+                }
+            }).catch(() => { });
+        }
+
+        function destroy() {
+            if (duckTimer) {
+                clearTimeout(duckTimer);
+                duckTimer = null;
+            }
+            isDucked = false;
+            pendingKey = null;
+            if (sceneTrack) {
+                try {
+                    if (sceneTrack.src) sceneTrack.src.stop();
+                    if (sceneTrack.gain) sceneTrack.gain.disconnect();
+                } catch (_) { }
+                sceneTrack = null;
+            }
+            if (ctx && ctx.state !== "closed") {
+                try {
+                    ctx.close();
+                } catch (_) { }
+                ctx = null;
+            }
+            unlocked = false;
+        }
+
+        return {
+            unlock,
+            onSegment,
+            onLoopRestart,
+            syncWatchdog,
+            duck,
+            scheduledUnduck,
+            destroy
+        };
+    })();
+
+    // ─── CENTRALIZED EVENT MANAGER ───────────────────────────────────────────
+    const eventManager = {
+        listeners: [],
+        add(target, type, handler, options) {
+            if (!target || typeof target.addEventListener !== "function") return;
+            target.addEventListener(type, handler, options);
+            this.listeners.push({ target, type, handler, options });
+        },
+        removeAll() {
+            for (let i = 0; i < this.listeners.length; i++) {
+                const item = this.listeners[i];
+                try {
+                    item.target.removeEventListener(item.type, item.handler, item.options);
+                } catch (_) { }
+            }
+            this.listeners = [];
+        }
+    };
+
+    // ─── SEGMENTS CONFIGURATION ──────────────────────────────────────────────
     const segments = [{
         stage: 0,
         mode: "LOOP",
@@ -93,40 +353,41 @@
         description: "A final moment in the underwater world. The ocean is vast, and there is still more to discover.",
         name: "BLUE ABYSS"
     }];
-    const videos = [document.querySelector("#videoA"), document.querySelector("#videoB")];
-    let pendingPassageSeek = null;
-    // Request a single frame seek. If the browser is already seeking, wait for
-    // that seek to finish; render() will request the next intermediate frame.
-    function applyPassageSeek(video, targetTime) {
-        if (!video || video.seeking) return;
-        if (Math.abs(video.currentTime - targetTime) < 0.015) return;
-        try {
-            video.currentTime = targetTime;
-        } catch (_) { }
-    }
-    // Never jump straight to a newer target on seeked. render() advances one
-    // 24fps frame at a time until it catches up with the scroll target.
-    videos.forEach(v => {
-        v.addEventListener("seeked", () => {
-            if (v === videos[activeVideo] && segments[activeSegment] && segments[activeSegment].type === "passage") {
-                currentPassageFrame = Math.round(v.currentTime * 24);
-            }
-        });
-    });
 
-    const copy = document.querySelector(".copy");
-    const eyebrow = document.querySelector("#eyebrow");
-    const heading = document.querySelector("#heading");
-    const description = document.querySelector("#description");
-    const stageName = document.querySelector("#stageName");
-    const modeLabel = document.querySelector("#modeLabel");
-    const number = document.querySelector("#progressNumber");
-    const loading = document.querySelector("#loading");
-    const prompt = document.querySelector("#scrollPrompt");
-    const particles = document.querySelector("#particles");
-    const dots = [...document.querySelectorAll(".journey-nav button")];
-    const journeyCta = document.querySelector("#journeyCta");
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Dynamic DOM references (re-queried on each boot)
+    let videos = [];
+    let copy = null;
+    let eyebrow = null;
+    let heading = null;
+    let description = null;
+    let stageName = null;
+    let modeLabel = null;
+    let number = null;
+    let loading = null;
+    let prompt = null;
+    let particles = null;
+    let dots = [];
+    let journeyCta = null;
+    let experience = null;
+
+    function queryDOMElements() {
+        videos = [document.querySelector("#videoA"), document.querySelector("#videoB")];
+        copy = document.querySelector(".copy");
+        eyebrow = document.querySelector("#eyebrow");
+        heading = document.querySelector("#heading");
+        description = document.querySelector("#description");
+        stageName = document.querySelector("#stageName");
+        modeLabel = document.querySelector("#modeLabel");
+        number = document.querySelector("#progressNumber");
+        loading = document.querySelector("#loading");
+        prompt = document.querySelector("#scrollPrompt");
+        particles = document.querySelector("#particles");
+        dots = [...document.querySelectorAll(".journey-nav button")];
+        journeyCta = document.querySelector("#journeyCta");
+        experience = document.querySelector(".experience");
+    }
+
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     let activeVideo = 0;
     let activeSegment = 0;
     let target = 0;
@@ -142,38 +403,38 @@
     let touchY = null;
     let wheelAccumulator = 0;
     let holdMode = false;
-    const HOLD_PLAYBACK_RATE = 2.5; // Change this to tune hold-to-watch playback speed.
+    const HOLD_PLAYBACK_RATE = 2.5;
 
     // ─── LOOP PLAYBACK & SCROLL FAST-FORWARD TUNING ───────────────────────────
-    const V1L_BASE_PLAYBACK_RATE = 1.2;             // Idle loop speed for V1L (segment 0) when not scrolling
-    const OTHER_LOOPS_BASE_PLAYBACK_RATE = 1.0;     // Idle loop speed for all other loops when not scrolling
-    const V1L_SCROLL_SPEED_MULTIPLIER = 3.0;        // Controls scroll fast-forward speed for V1L (14s video)
-    const DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER = 2.0; // Controls scroll fast-forward speed for 4s loops
-    const V1L_PLAYBACK_RATE = V1L_BASE_PLAYBACK_RATE; // Backward-compatibility alias
-    const LOOP_SCROLL_RATE = DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER; // Backward-compatibility alias
+    const V1L_BASE_PLAYBACK_RATE = 1.2;
+    const OTHER_LOOPS_BASE_PLAYBACK_RATE = 1.0;
+    const V1L_SCROLL_SPEED_MULTIPLIER = 4.0;
+    const DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER = 2.0;
 
-    let loopScrollBoost = 0; // Dynamic scroll acceleration for loops, smoothly decays in render()
+    let loopScrollBoost = 0;
     const SCROLL_IDLE_MS = 260;
 
-    // ─── LOOP EXIT WINDOW TUNING (SECONDS) ────────────────────────────────────
-    // A forward scroll on a loop video only counts if the loop is within this many
-    // seconds (real time) of finishing. Earlier scrolls fast-forward/accelerate the loop.
-    const V1L_LOOP_EXIT_WINDOW_S = 0.3;             // Exit window for V1L (segment 0 / 14s video)
-    const OTHER_LOOPS_EXIT_WINDOW_S = 0.3;         // Exit window for all other 4s loop segments
-    const LOOP_EXIT_WINDOW_S = OTHER_LOOPS_EXIT_WINDOW_S; // Backward-compatibility alias
+    const V1L_LOOP_EXIT_WINDOW_S = 0.3;
+    const OTHER_LOOPS_EXIT_WINDOW_S = 0.3;
+
     let copyAnimTimer = null;
+    let videoFadeTimeout = null;
+    let touchHoldTimeout = null;
     let lastPromptOpacity = "";
     let renderRafId = null;
-    let destroyed = false;
-    // Approx. one full viewport-height worth of input moves a little over one segment.
-    // Change this value if the journey feels too fast or too slow.
+    let destroyed = true;
+    let isActive = false;
+
     const INPUT_DISTANCE_PER_VIEWPORT = 1.0;
-    // Mouse-wheel sensitivity: lower = fewer video frames advanced per wheel notch.
-    // Try 0.025 first; 0.01 is very precise, 0.05 is faster.
-    const WHEEL_SENSITIVITY = 0.025;
-    // Touch/mobile swipe sensitivity: lower = slower, less sensitive swipe.
-    // Default is 0.5 (half speed). Adjust between 0.2 and 1.0 to taste without altering desktop wheel.
-    const TOUCH_SENSITIVITY = 0.04;
+    const WHEEL_SENSITIVITY = 0.015;
+    const TOUCH_SENSITIVITY = 0.1;
+    const TOUCH_HOLD_DELAY_MS = 380;
+    const TOUCH_MOVE_CANCEL_DIST = 10;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchIsScrolling = false;
+
     const totalWeight = segments.reduce((sum, segment) => sum + segment.weight, 0);
     const starts = [];
     let weightSum = 0;
@@ -181,9 +442,16 @@
         starts.push(weightSum / totalWeight);
         weightSum += segment.weight;
     });
+
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-    const scrollingRecently = () => performance.now() - lastInputAt < SCROLL_IDLE_MS;
-    const loopScrollingRecently = () => performance.now() - lastLoopForwardAt < SCROLL_IDLE_MS;
+
+    function applyPassageSeek(video, targetTime) {
+        if (!video || video.seeking) return;
+        if (Math.abs(video.currentTime - targetTime) < 0.015) return;
+        try {
+            video.currentTime = targetTime;
+        } catch (_) { }
+    }
 
     function segmentAt(progress) {
         const position = clamp(progress, 0, 0.999999) * totalWeight;
@@ -210,42 +478,46 @@
         if (cta) {
             cta.classList.toggle("is-visible", segment.stage === 0 || segment.stage === 6);
             const ctaTitle = cta.querySelector(".journey-cta-title");
-            if (ctaTitle) ctaTitle.textContent = segment.stage === 6 ? "Explore beyond the abyss" : "Explore the ocean";
+            if (ctaTitle) ctaTitle.textContent = segment.stage === 6 ? "Explore beyond the abyss" : "Explore the BLUE";
             cta.setAttribute("aria-hidden", String(!(segment.stage === 0 || segment.stage === 6)));
             cta.tabIndex = (segment.stage === 0 || segment.stage === 6) ? 0 : -1;
         }
 
-        if (copyAnimTimer) clearTimeout(copyAnimTimer);
+        if (copyAnimTimer) {
+            clearTimeout(copyAnimTimer);
+            copyAnimTimer = null;
+        }
 
-        if (reduced) {
-            eyebrow.textContent = segment.eyebrow;
-            heading.innerHTML = segment.title;
-            description.textContent = segment.description;
-        } else {
-            // Smooth exit: fade out and glide upward with subtle blur
-            copy.classList.remove("entering");
-            copy.classList.add("changing");
-            copyAnimTimer = setTimeout(() => {
-                // Swap text while completely invisible
+        if (eyebrow && heading && description && copy) {
+            if (reduced) {
                 eyebrow.textContent = segment.eyebrow;
                 heading.innerHTML = segment.title;
                 description.textContent = segment.description;
-
-                // Setup enter from below without transition
-                copy.classList.remove("changing");
-                copy.classList.add("entering");
-                void copy.offsetWidth; // Force layout reflow
-
-                // Animate smoothly to resting position
+            } else {
                 copy.classList.remove("entering");
-            }, 300);
+                copy.classList.add("changing");
+                copyAnimTimer = setTimeout(() => {
+                    copyAnimTimer = null;
+                    if (destroyed || !isActive) return;
+                    eyebrow.textContent = segment.eyebrow;
+                    heading.innerHTML = segment.title;
+                    description.textContent = segment.description;
+
+                    copy.classList.remove("changing");
+                    copy.classList.add("entering");
+                    void copy.offsetWidth;
+                    copy.classList.remove("entering");
+                }, 300);
+            }
         }
 
-        stageName.textContent = segment.name;
-        modeLabel.textContent = segment.mode;
-        number.textContent = String(segment.stage + 1).padStart(2, "0");
-        dots.forEach((dot, i) => dot.classList.toggle("active", i === segment.stage));
-        particles.classList.toggle("on", segment.stage >= 3);
+        if (stageName) stageName.textContent = segment.name;
+        if (modeLabel) modeLabel.textContent = segment.mode;
+        if (number) number.textContent = String(segment.stage + 1).padStart(2, "0");
+        if (dots && dots.length) {
+            dots.forEach((dot, i) => dot.classList.toggle("active", i === segment.stage));
+        }
+        if (particles) particles.classList.toggle("on", segment.stage >= 3);
     }
 
     function restartLoop(video, segment) {
@@ -257,12 +529,11 @@
             video.currentTime = 0;
         } catch (_) { }
         video.play().catch(() => { });
-        // Restart synced audio in phase with video reset
         audioMgr.onLoopRestart(video);
     }
 
     function handleLoopEnded(video, segment) {
-        // A loop can hand off to its next segment when scrolling forwards or when next segment is queued
+        if (destroyed || !isActive) return;
         const wantsNext = (pendingLoopNext === activeSegment + 1) || (segmentAt(target).index > activeSegment);
         if (wantsNext && activeSegment + 1 < segments.length) {
             allowLoopTransition = true;
@@ -271,7 +542,6 @@
             pendingLoopNext = null;
             return;
         }
-        // If user is not scrolling forward, stay in this scene and loop
         pendingLoopNext = null;
         allowLoopTransition = false;
         target = starts[activeSegment] + 0.00001;
@@ -280,6 +550,7 @@
     }
 
     function activateSegment(index) {
+        if (destroyed || !isActive) return;
         if (index === activeSegment) return;
         const enteringBackward = index < activeSegment;
         const segment = segments[index];
@@ -291,29 +562,25 @@
         activeSegment = index;
         allowLoopTransition = false;
         pendingLoopNext = null;
-        // Entering a loop going forward starts fresh: drop any scroll overshoot carried
-        // over from the previous passage so it can't queue an instant exit.
+
         if (segment.type === "loop" && !enteringBackward) {
             target = starts[index] + 0.00001;
             smooth = target;
             loopScrollBoost = 0;
         }
         updateCopy(index);
+
         const showVideo = () => {
-            if (token !== loadToken) return;
+            if (token !== loadToken || destroyed || !isActive) return;
             nextVideo.onended = null;
             nextVideo.loop = false;
             if (holdMode) {
-                // Hold-to-watch mode: every clip plays once, including passage clips.
                 nextVideo.loop = false;
                 nextVideo.playbackRate = HOLD_PLAYBACK_RATE;
                 nextVideo.onended = () => advanceHoldSequence();
                 nextVideo.play().catch(() => { });
             } else if (segment.type === "passage") {
                 nextVideo.pause();
-                // Re-entering a passage from a later segment while moving backward
-                // should start at the final 24fps frame, then scrub backward toward
-                // the requested position instead of restarting from frame zero.
                 try {
                     if (enteringBackward && Number.isFinite(nextVideo.duration) && nextVideo.duration > 0) {
                         const finalFrameTime = Math.max(0, Math.floor(nextVideo.duration * 24 - 1) / 24);
@@ -335,13 +602,22 @@
             nextVideo.classList.add("visible");
             oldVideo.classList.remove("visible");
             activeVideo = nextIndex;
-            // Trigger audio crossfade to match the new segment
             audioMgr.onSegment(segment.file, nextVideo);
-            window.setTimeout(() => {
-                if (oldVideo !== videos[activeVideo]) oldVideo.pause();
+
+            if (videoFadeTimeout) {
+                clearTimeout(videoFadeTimeout);
+                videoFadeTimeout = null;
+            }
+            videoFadeTimeout = window.setTimeout(() => {
+                videoFadeTimeout = null;
+                if (!destroyed && isActive && oldVideo && oldVideo !== videos[activeVideo]) {
+                    oldVideo.pause();
+                }
             }, reduced ? 0 : 1050);
-            loading.classList.add("done");
+
+            if (loading) loading.classList.add("done");
         };
+
         nextVideo.pause();
         nextVideo.onloadedmetadata = null;
         if (!(nextVideo.getAttribute("src") || "").endsWith(source)) {
@@ -359,12 +635,11 @@
     }
 
     function advanceHoldSequence() {
-        if (!holdMode) return;
+        if (!holdMode || destroyed || !isActive) return;
         const next = activeSegment + 1;
         if (next >= segments.length) {
-            // End of the journey: stop at the final frame rather than looping.
             const finalVideo = videos[activeVideo];
-            finalVideo.pause();
+            if (finalVideo) finalVideo.pause();
             holdMode = false;
             return;
         }
@@ -375,13 +650,6 @@
         activateSegment(next);
     }
 
-    let touchHoldTimeout = null;
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchIsScrolling = false;
-    const TOUCH_HOLD_DELAY_MS = 380;
-    const TOUCH_MOVE_CANCEL_DIST = 10;
-
     function cancelTouchHoldTimer() {
         if (touchHoldTimeout !== null) {
             clearTimeout(touchHoldTimeout);
@@ -390,6 +658,7 @@
     }
 
     function beginHoldMode(event) {
+        if (destroyed || !isActive) return;
         if (event && event.button !== undefined && event.button !== 0) return;
         if (event && event.target && event.target.closest && event.target.closest(".journey-nav, .site-menu, .journey-cta, .logo")) return;
         if (holdMode) return;
@@ -397,20 +666,22 @@
         pendingLoopNext = null;
         allowLoopTransition = false;
         const video = videos[activeVideo];
+        if (!video) return;
         video.loop = false;
         video.playbackRate = HOLD_PLAYBACK_RATE;
         video.onended = () => advanceHoldSequence();
-        // In hold mode the current clip plays from the frame currently visible.
         if (video.readyState >= 2) video.play().catch(() => { });
     }
 
     function endHoldMode() {
         cancelTouchHoldTimer();
-        if (!holdMode) return;
+        if (!holdMode || destroyed || !isActive) return;
         holdMode = false;
         const video = videos[activeVideo];
+        if (!video) return;
         video.onended = null;
         const segment = segments[activeSegment];
+        if (!segment) return;
         if (segment.type === "passage") {
             video.pause();
             if (Number.isFinite(video.duration) && video.duration > 0) {
@@ -419,7 +690,6 @@
                 smooth = target;
             }
         } else {
-            // Restore the ordinary ambient loop behavior when the pointer is released.
             video.loop = true;
             const baseRate = segment.stage === 0 ? V1L_BASE_PLAYBACK_RATE : OTHER_LOOPS_BASE_PLAYBACK_RATE;
             video.playbackRate = baseRate;
@@ -432,67 +702,29 @@
         }
     }
 
-    const experience = document.querySelector(".experience");
-
-    // Desktop mouse pointer handling: immediately trigger hold-to-watch on left mouse button.
-    // Touch pointers are handled via touchstart with a long-press timer so touch scrolling is not blocked.
-    experience.addEventListener("pointerdown", (e) => {
-        audioMgr.unlock(); // first gesture unlocks AudioContext
-        if (e.pointerType === "mouse" || e.pointerType === "pen") {
-            beginHoldMode(e);
-        }
-    });
-
-    // Also unlock on first wheel/key gesture (no pointer needed)
-    window.addEventListener("wheel", () => audioMgr.unlock(), {
-        once: true,
-        passive: true
-    });
-    window.addEventListener("keydown", () => audioMgr.unlock(), {
-        once: true
-    });
-    window.addEventListener("touchstart", () => audioMgr.unlock(), {
-        once: true,
-        passive: true
-    });
-
-    window.addEventListener("pointerup", (e) => {
-        if (!e.pointerType || e.pointerType === "mouse" || e.pointerType === "pen") {
-            endHoldMode();
-        }
-    });
-    window.addEventListener("pointercancel", endHoldMode);
-    window.addEventListener("blur", endHoldMode);
-
-    // True when the active loop video will finish within exit window of real time.
     function loopExitWindowOpen() {
         const video = videos[activeVideo];
         if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return false;
-        // Paused/blocked video can never reach its end, so don't lock the user in.
         if (video.ended || video.paused) return true;
         const isV1L = segments[activeSegment] && segments[activeSegment].stage === 0;
         if (isV1L) {
-            // For V1L (14s video), check the exact video seconds remaining directly against V1L_LOOP_EXIT_WINDOW_S.
-            // Do NOT divide by accelerated playbackRate, which previously inflated a 0.3s window to 3-4s during scrolling.
             return (video.duration - video.currentTime) <= V1L_LOOP_EXIT_WINDOW_S;
         }
         const rate = video.playbackRate > 0 ? video.playbackRate : 1;
         return (video.duration - video.currentTime) / rate <= OTHER_LOOPS_EXIT_WINDOW_S;
     }
 
-    // Returns true if the input was used, false if it was ignored.
     function advanceVirtualScroll(deltaPixels) {
+        if (destroyed || !isActive) return false;
         const seg = segments[activeSegment];
         if (deltaPixels > 0 && seg && seg.type === "loop" && !holdMode && pendingLoopNext === null) {
             lastLoopForwardAt = performance.now();
             lastInputAt = performance.now();
-            // Forward scroll on a loop: only valid near the end of the loop.
             if (activeSegment + 1 >= segments.length || !loopExitWindowOpen()) return false;
-            // Commit now: stop looping, finish this playback, then hand off to the next segment.
             pendingLoopNext = activeSegment + 1;
             target = starts[pendingLoopNext] + 0.00001;
             smooth = target;
-            videos[activeVideo].loop = false;
+            if (videos[activeVideo]) videos[activeVideo].loop = false;
             return true;
         }
         lastInputAt = performance.now();
@@ -503,8 +735,9 @@
         }
         return true;
     }
-    // Intercept wheel scrolling so there is no finite browser scrollbar to run out of.
-    window.addEventListener("wheel", event => {
+
+    function handleWheel(event) {
+        if (destroyed || !isActive) return;
         event.preventDefault();
         let delta = event.deltaY;
         if (event.deltaMode === 1) delta *= 16;
@@ -513,7 +746,6 @@
         if (currentSeg && currentSeg.type === "loop") {
             const isStage0 = currentSeg.stage === 0;
             if (delta > 0) {
-                // Forward scroll boosts loop playbackRate smoothly
                 const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                 const impulse = (Math.abs(delta) / 100) * (multiplier * 0.45);
                 loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
@@ -529,14 +761,12 @@
                 : (delta > 0 ? 0.35 : 0.2);
             advanceVirtualScroll(delta * loopMultiplier);
         } else {
-            // Precise frame-level control for passage videos
             advanceVirtualScroll(delta * WHEEL_SENSITIVITY);
         }
-    }, {
-        passive: false
-    });
-    // Touch support for phones/tablets.
-    window.addEventListener("touchstart", event => {
+    }
+
+    function handleTouchStart(event) {
+        if (destroyed || !isActive) return;
         if (!event.touches.length) return;
         const touch = event.touches[0];
         touchY = touch.clientY;
@@ -544,31 +774,25 @@
         touchStartY = touch.clientY;
         touchIsScrolling = false;
 
-        // Cancel any existing long-press timer
         cancelTouchHoldTimer();
 
-        // If user tapped navigation, do not trigger hold mode
         if (event.target && event.target.closest && event.target.closest(".journey-nav")) return;
 
-        // Start long-press timer: if touch stays stationary for TOUCH_HOLD_DELAY_MS, enter hold mode
         touchHoldTimeout = setTimeout(() => {
             touchHoldTimeout = null;
-            if (!touchIsScrolling) {
+            if (!touchIsScrolling && !destroyed && isActive) {
                 beginHoldMode({ button: 0, target: event.target });
             }
         }, TOUCH_HOLD_DELAY_MS);
-    }, {
-        passive: true
-    });
+    }
 
-    window.addEventListener("touchmove", event => {
+    function handleTouchMove(event) {
+        if (destroyed || !isActive) return;
         if (touchY === null || !event.touches.length) return;
         const touch = event.touches[0];
         const dx = Math.abs(touch.clientX - touchStartX);
         const dy = Math.abs(touch.clientY - touchStartY);
 
-        // If user moved finger beyond cancel threshold, it is a scroll gesture:
-        // cancel long-press hold timer and exit hold mode if already triggered.
         if (dx > TOUCH_MOVE_CANCEL_DIST || dy > TOUCH_MOVE_CANCEL_DIST) {
             cancelTouchHoldTimer();
             if (holdMode) {
@@ -597,32 +821,23 @@
         }
         advanceVirtualScroll(deltaY * TOUCH_SENSITIVITY);
         touchY = y;
-    }, {
-        passive: false
-    });
+    }
 
-    window.addEventListener("touchend", () => {
+    function handleTouchEnd() {
         cancelTouchHoldTimer();
         if (holdMode) {
             endHoldMode();
         }
         touchY = null;
         touchIsScrolling = false;
-    }, {
-        passive: true
-    });
+    }
 
-    window.addEventListener("touchcancel", () => {
-        cancelTouchHoldTimer();
-        if (holdMode) {
-            endHoldMode();
-        }
-        touchY = null;
-        touchIsScrolling = false;
-    }, {
-        passive: true
-    });
-    window.addEventListener("keydown", event => {
+    function handleTouchCancel() {
+        handleTouchEnd();
+    }
+
+    function handleKeyDown(event) {
+        if (destroyed || !isActive) return;
         if (event.code === "Space" && !event.repeat) {
             event.preventDefault();
             beginHoldMode({
@@ -659,12 +874,14 @@
             loopScrollBoost = 0;
             lastInputAt = performance.now();
         }
-    });
-    window.addEventListener("keyup", event => {
+    }
+
+    function handleKeyUp(event) {
         if (event.code === "Space") endHoldMode();
-    });
+    }
 
     function goToStage(stage) {
+        if (destroyed || !isActive) return;
         const firstSegment = segments.findIndex(segment => segment.stage === stage);
         if (firstSegment < 0) return;
         pendingLoopNext = null;
@@ -675,32 +892,10 @@
         lastInputAt = performance.now();
         activateSegment(firstSegment);
     }
-    dots.forEach(dot => {
-        dot.addEventListener("click", (e) => {
-            e.stopPropagation();
-            goToStage(Number(dot.dataset.stage));
-        });
-    });
-
-    if (prompt) {
-        prompt.addEventListener("click", () => {
-            const currentSeg = segments[activeSegment];
-            if (currentSeg && currentSeg.type === "loop") {
-                const isStage0 = currentSeg.stage === 0;
-                const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
-                loopScrollBoost = Math.min(15.0, loopScrollBoost + multiplier * 0.9);
-                lastLoopForwardAt = performance.now();
-                lastInputAt = performance.now();
-                audioMgr.duck();
-                audioMgr.scheduledUnduck();
-            }
-            advanceVirtualScroll(window.innerHeight * 0.35);
-        });
-    }
 
     function render() {
-        if (destroyed) return;
-        // Smooth the virtual position. Passage videos use higher responsiveness for immediate 24fps feedback.
+        if (destroyed || !isActive) return;
+
         const isPassage = segments[activeSegment] && segments[activeSegment].type === "passage";
         const smoothRate = isPassage ? 0.28 : 0.085;
         smooth += (target - smooth) * (reduced ? 1 : smoothRate);
@@ -708,13 +903,11 @@
         const desired = segmentAt(smooth);
         let chosen = desired;
 
-        // Calculate loop playback rate with smooth boost decay
         const isLoop = segments[activeSegment] && segments[activeSegment].type === "loop";
         let activeLoopRate = 1.0;
         if (isLoop) {
             const isStage0 = segments[activeSegment].stage === 0;
             const baseRate = isStage0 ? V1L_BASE_PLAYBACK_RATE : OTHER_LOOPS_BASE_PLAYBACK_RATE;
-            // Decay boost smoothly on each frame (approx 0.91 damping per 16ms frame)
             if (loopScrollBoost > 0.005) {
                 loopScrollBoost *= 0.91;
                 if (loopScrollBoost < 0.005) loopScrollBoost = 0;
@@ -726,7 +919,6 @@
             loopScrollBoost = 0;
         }
 
-        // Forward movement out of a loop waits for its end, then advances exactly one segment.
         if (activeSegment >= 0 && segments[activeSegment].type === "loop" && desired.index > activeSegment && !allowLoopTransition) {
             const nextIdx = activeSegment + 1;
             pendingLoopNext = nextIdx;
@@ -736,10 +928,9 @@
                 local: 1
             };
             const loopVideo = videos[activeVideo];
-            if (loopVideo.readyState >= 2) {
-                loopVideo.loop = false; // finish this playback once, then hand off
+            if (loopVideo && loopVideo.readyState >= 2) {
+                loopVideo.loop = false;
                 loopVideo.playbackRate = activeLoopRate;
-                // If scrolling forward and the video is already near the end (or ended), transition immediately
                 if (loopVideo.ended || (Number.isFinite(loopVideo.duration) && loopVideo.duration > 0 && (loopVideo.duration - loopVideo.currentTime) <= 0.2)) {
                     allowLoopTransition = true;
                     target = starts[nextIdx] + 0.00001;
@@ -751,46 +942,43 @@
                 }
             }
         }
-        // Backward navigation is immediate so the journey remains reversible.
+
         if (activeSegment >= 0 && desired.index < activeSegment) chosen = desired;
         if (chosen.index !== activeSegment) {
             activateSegment(chosen.index);
         }
         const segment = segments[chosen.index];
         const video = videos[activeVideo];
-        if (holdMode) {
-            video.loop = false;
-            video.playbackRate = HOLD_PLAYBACK_RATE;
-            if (video.paused && !video.ended && video.readyState >= 2) video.play().catch(() => { });
-        } else if (segment.type === "passage" && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
-            const time = clamp(chosen.local * Math.max(0, video.duration - 0.035), 0, video.duration);
-            // Quantize to true 24fps frames (1/24s = ~0.04167s) so seeking only occurs when reaching a new frame
-            const frameDuration = 1 / 24;
-            const targetFrame = Math.round(time / frameDuration);
-            const displayedFrame = Math.round(video.currentTime / frameDuration);
-            // Advance only one frame per completed seek. If scrolling changes
-            // the target from A to C, frames between A and C are requested in order.
-            currentPassageFrame = displayedFrame;
-            if (!video.seeking && displayedFrame !== targetFrame) {
-                const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
-                const nextTargetTime = nextFrame * frameDuration;
-                if (Math.abs(video.currentTime - nextTargetTime) >= 0.015) {
-                    applyPassageSeek(video, nextTargetTime);
+        if (video) {
+            if (holdMode) {
+                video.loop = false;
+                video.playbackRate = HOLD_PLAYBACK_RATE;
+                if (video.paused && !video.ended && video.readyState >= 2) video.play().catch(() => { });
+            } else if (segment.type === "passage" && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
+                const time = clamp(chosen.local * Math.max(0, video.duration - 0.035), 0, video.duration);
+                const frameDuration = 1 / 24;
+                const targetFrame = Math.round(time / frameDuration);
+                const displayedFrame = Math.round(video.currentTime / frameDuration);
+                currentPassageFrame = displayedFrame;
+                if (!video.seeking && displayedFrame !== targetFrame) {
+                    const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
+                    const nextTargetTime = nextFrame * frameDuration;
+                    if (Math.abs(video.currentTime - nextTargetTime) >= 0.015) {
+                        applyPassageSeek(video, nextTargetTime);
+                    }
                 }
-            }
-            if (!video.paused) video.pause();
-        } else if (segment.type === "loop") {
-            if (chosen.index === desired.index && desired.index === activeSegment && !allowLoopTransition) {
-                video.loop = true;
-                video.playbackRate = activeLoopRate;
-                if (video.paused && video.readyState >= 2) video.play().catch(() => { });
-                // Drift-correction for synced loop audio
-                audioMgr.syncWatchdog(video);
+                if (!video.paused) video.pause();
+            } else if (segment.type === "loop") {
+                if (chosen.index === desired.index && desired.index === activeSegment && !allowLoopTransition) {
+                    video.loop = true;
+                    video.playbackRate = activeLoopRate;
+                    if (video.paused && video.readyState >= 2) video.play().catch(() => { });
+                    audioMgr.syncWatchdog(video);
+                }
             }
         }
         if (allowLoopTransition) {
             allowLoopTransition = false;
-            // The next frame sees the desired scroll position and activates the next segment.
         }
         const isAtInitialStage = smooth < 0.015 && activeSegment === 0;
         const isPromptVisible = isAtInitialStage && (performance.now() - lastInputAt > PROMPT_IDLE_FADE_MS);
@@ -801,45 +989,194 @@
             prompt.classList.toggle("is-hidden", !isPromptVisible);
             lastPromptOpacity = nextPromptState;
         }
-        renderRafId = requestAnimationFrame(render);
+
+        if (!destroyed && isActive) {
+            renderRafId = requestAnimationFrame(render);
+        }
     }
 
     function destroy() {
+        if (destroyed && !isActive) return;
         destroyed = true;
-        loopScrollBoost = 0;
+        isActive = false;
+
+        // 1. Remove all registered event listeners
+        eventManager.removeAll();
+
+        // 2. Cancel animation frame loop
         if (renderRafId) {
             cancelAnimationFrame(renderRafId);
             renderRafId = null;
         }
+
+        // 3. Clear timers
         if (copyAnimTimer) {
             clearTimeout(copyAnimTimer);
             copyAnimTimer = null;
         }
-        videos.forEach(v => {
-            if (v) {
-                try {
-                    v.pause();
-                    v.removeAttribute("src");
-                    v.load();
-                } catch (_) { }
-            }
-        });
+        if (videoFadeTimeout) {
+            clearTimeout(videoFadeTimeout);
+            videoFadeTimeout = null;
+        }
+        cancelTouchHoldTimer();
+
+        // 4. Pause and unload videos
+        if (videos && videos.length) {
+            videos.forEach(v => {
+                if (v) {
+                    try {
+                        v.pause();
+                        v.onended = null;
+                        v.onloadedmetadata = null;
+                        v.removeAttribute("src");
+                        v.load();
+                    } catch (_) { }
+                }
+            });
+        }
+
+        // 5. Clean up audio manager
         if (typeof audioMgr !== "undefined" && audioMgr.destroy) {
             audioMgr.destroy();
         }
+
+        loopScrollBoost = 0;
+        holdMode = false;
+        touchY = null;
+        touchIsScrolling = false;
     }
 
     function boot() {
+        queryDOMElements();
+
+        // If required DOM elements are absent (not on homepage), bail out
+        if (!videos[0] || !videos[1] || !experience) {
+            return;
+        }
+
+        // Guard against duplicate initialization on active instance
+        if (isActive && !destroyed) {
+            return;
+        }
+
+        // Clean up any stale state first
+        destroy();
+
         destroyed = false;
-        loopScrollBoost = 0;
+        isActive = true;
+
+        // Reset runtime values
+        activeVideo = 0;
+        activeSegment = 0;
+        target = 0;
+        smooth = 0;
+        currentPassageFrame = 0;
+        lastFrameStepTime = 0;
         lastInputAt = -Infinity;
+        lastLoopForwardAt = -Infinity;
+        allowLoopTransition = false;
+        pendingLoopNext = null;
+        loadToken = 0;
+        touchY = null;
+        wheelAccumulator = 0;
+        holdMode = false;
+        loopScrollBoost = 0;
         lastPromptOpacity = "";
+
+        // Register video seeked listeners
+        videos.forEach(v => {
+            if (!v) return;
+            eventManager.add(v, "seeked", () => {
+                if (destroyed || !isActive) return;
+                if (v === videos[activeVideo] && segments[activeSegment] && segments[activeSegment].type === "passage") {
+                    currentPassageFrame = Math.round(v.currentTime * 24);
+                }
+            });
+        });
+
+        // Pointer down on experience
+        eventManager.add(experience, "pointerdown", (e) => {
+            if (destroyed || !isActive) return;
+            audioMgr.unlock();
+            if (e.pointerType === "mouse" || e.pointerType === "pen") {
+                beginHoldMode(e);
+            }
+        });
+
+        // Audio unlock gestures
+        const unlockAudio = () => audioMgr.unlock();
+        eventManager.add(window, "wheel", unlockAudio, { once: true, passive: true });
+        eventManager.add(window, "keydown", unlockAudio, { once: true });
+        eventManager.add(window, "touchstart", unlockAudio, { once: true, passive: true });
+
+        // Pointer up / cancel / blur
+        eventManager.add(window, "pointerup", (e) => {
+            if (destroyed || !isActive) return;
+            if (!e.pointerType || e.pointerType === "mouse" || e.pointerType === "pen") {
+                endHoldMode();
+            }
+        });
+        eventManager.add(window, "pointercancel", endHoldMode);
+        eventManager.add(window, "blur", endHoldMode);
+
+        // Wheel scrolling
+        eventManager.add(window, "wheel", handleWheel, { passive: false });
+
+        // Touch events
+        eventManager.add(window, "touchstart", handleTouchStart, { passive: true });
+        eventManager.add(window, "touchmove", handleTouchMove, { passive: false });
+        eventManager.add(window, "touchend", handleTouchEnd, { passive: true });
+        eventManager.add(window, "touchcancel", handleTouchCancel, { passive: true });
+
+        // Keyboard events
+        eventManager.add(window, "keydown", handleKeyDown);
+        eventManager.add(window, "keyup", handleKeyUp);
+
+        // Stage navigation dots
+        if (dots && dots.length) {
+            dots.forEach(dot => {
+                if (!dot) return;
+                eventManager.add(dot, "click", (e) => {
+                    if (destroyed || !isActive) return;
+                    e.stopPropagation();
+                    goToStage(Number(dot.dataset.stage));
+                });
+            });
+        }
+
+        // Scroll prompt click
+        if (prompt) {
+            eventManager.add(prompt, "click", () => {
+                if (destroyed || !isActive) return;
+                const currentSeg = segments[activeSegment];
+                if (currentSeg && currentSeg.type === "loop") {
+                    const isStage0 = currentSeg.stage === 0;
+                    const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
+                    loopScrollBoost = Math.min(15.0, loopScrollBoost + multiplier * 0.9);
+                    lastLoopForwardAt = performance.now();
+                    lastInputAt = performance.now();
+                    audioMgr.duck();
+                    audioMgr.scheduledUnduck();
+                }
+                advanceVirtualScroll(window.innerHeight * 0.35);
+            });
+        }
+
         if (prompt) {
             prompt.style.opacity = "1";
             prompt.style.pointerEvents = "auto";
             prompt.classList.remove("is-hidden");
         }
+
         const first = videos[0];
+        const second = videos[1];
+        if (second) {
+            second.classList.remove("visible");
+            second.pause();
+            second.removeAttribute("src");
+            second.load();
+        }
+
         first.src = `/assets/master/${segments[0].file}`;
         first.loop = true;
         first.playbackRate = V1L_BASE_PLAYBACK_RATE;
@@ -848,272 +1185,14 @@
         first.load();
         first.play().catch(() => { });
         first.classList.add("visible");
-        loading.classList.add("done");
+
+        if (loading) loading.classList.add("done");
+
         if (renderRafId) cancelAnimationFrame(renderRafId);
         renderRafId = requestAnimationFrame(render);
     }
+
     boot();
     window.__blueScrollyDestroy = destroy;
     window.__blueScrollyInit = boot;
 })();
-
-// ─── AUDIO MANAGER ───────────────────────────────────────────────────────
-//
-// Segment audio map:
-//   file key      → { src, sync: bool, videoFile }
-//
-//   "V4Lds"       → V4LA.mp3,     synced to V4Lds.mp4    (4.46 s)
-//   "V5.14Lds"    → V5and8LA.mp3, free loop               (8 s)
-//   "V6Lds_s27"   → V6LA.mp3,     synced to V6Lds_s27.mp4 (4.46 s)
-//   "V8Lds_b"     → V5and8LA.mp3, free loop               (8 s)
-//   all others    → no scene audio
-//   VBM.mp3       → always on background music
-//
-const SEGMENT_AUDIO = {
-    "V4Lds": {
-        src: "/assets/audio/V4LA.mp3",
-        sync: true
-    },
-    "V5.14Lds": {
-        src: "/assets/audio/V5and8LA.mp3",
-        sync: false
-    },
-    "V6Lds_s27": {
-        src: "/assets/audio/V6LA.mp3",
-        sync: true
-    },
-    "V8Lds_b": {
-        src: "/assets/audio/V5and8LA.mp3",
-        sync: false
-    },
-};
-// Background music disabled per Issue #10: VBM.mp3 removed; ocean and underwater SFX preserved.
-const FADE_S = 0.55; // crossfade duration in seconds
-const BG_VOL = 0.18; // background music target volume (legacy reference)
-const SCENE_VOL = 0.82; // scene audio target volume
-const DUCK_VOL = 0.25; // scene audio volume when fast-forwarding
-const SCENE_IDLE_MS = 350; // ms after scroll stops before unduck
-const audioMgr = (() => {
-    let ctx = null; // AudioContext, created on first gesture
-    let unlocked = false;
-    // Per-track state: each is { buf, src:AudioBufferSourceNode|null, gain:GainNode }
-    let bgTrack = null;
-    let sceneTrack = null; // currently playing scene
-    let pendingKey = null; // segment file key for current segment
-    let duckTimer = null;
-    let isDucked = false;
-    // Buffer cache so each file is decoded only once
-    const bufCache = Object.create(null);
-
-    function getCtx() {
-        if (!ctx) {
-            ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        return ctx;
-    }
-
-    function fetchBuf(src) {
-        if (bufCache[src]) return bufCache[src];
-        bufCache[src] = fetch(src).then(r => r.arrayBuffer()).then(ab => getCtx().decodeAudioData(ab));
-        return bufCache[src];
-    }
-    // Ramp a GainNode smoothly
-    function ramp(gainNode, toVal, durationS) {
-        const ac = getCtx();
-        gainNode.gain.cancelScheduledValues(ac.currentTime);
-        gainNode.gain.setValueAtTime(gainNode.gain.value, ac.currentTime);
-        gainNode.gain.linearRampToValueAtTime(toVal, ac.currentTime + durationS);
-    }
-    // Create a looping source connected to a gain node
-    function makeLoop(buf, gainNode, startOffset) {
-        const src = getCtx().createBufferSource();
-        src.buffer = buf;
-        src.loop = true;
-        src.connect(gainNode);
-        src.start(0, startOffset % buf.duration);
-        return src;
-    }
-
-    function startBg() {
-        // Disabled per Issue #10: Background music removed; ocean & underwater SFX preserved.
-    }
-    // Stop the current scene audio with a fade-out, then call cb when done
-    function stopScene(cb) {
-        if (!sceneTrack) {
-            if (cb) cb();
-            return;
-        }
-        const old = sceneTrack;
-        sceneTrack = null;
-        ramp(old.gain, 0, FADE_S);
-        setTimeout(() => {
-            try {
-                old.src.stop();
-            } catch (_) { }
-            if (cb) cb();
-        }, FADE_S * 1000 + 50);
-    }
-    // Kick off the scene audio for the given segment file-key
-    function startScene(key, videoEl) {
-        const def = SEGMENT_AUDIO[key];
-        if (!def) return; // no scene audio for this segment
-        fetchBuf(def.src).then(buf => {
-            if (pendingKey !== key) return; // segment changed while loading
-            const ac = getCtx();
-            const gain = ac.createGain();
-            gain.gain.setValueAtTime(0, ac.currentTime);
-            gain.connect(ac.destination);
-            let offset = 0;
-            if (def.sync && videoEl && Number.isFinite(videoEl.currentTime)) {
-                // Sync audio phase to video's current position
-                offset = videoEl.currentTime % buf.duration;
-            }
-            const src = makeLoop(buf, gain, offset);
-            sceneTrack = {
-                buf,
-                src,
-                gain,
-                key,
-                def
-            };
-            ramp(gain, isDucked ? DUCK_VOL : SCENE_VOL, FADE_S);
-        });
-    }
-    // Called by activateSegment whenever the visible segment changes
-    function onSegment(segmentFileKey, videoEl) {
-        if (!unlocked) return;
-        const key = segmentFileKey.replace(/\.mp4$/i, "").split("/").pop().replace(/^.*\//, "");
-        pendingKey = key;
-        if (sceneTrack && sceneTrack.key === key) return; // same scene, keep playing
-        stopScene(() => {
-            if (pendingKey === key) startScene(key, videoEl);
-        });
-    }
-    // Keep synced audio in phase with the looping video (call every render frame)
-    function syncFrame(videoEl) {
-        if (!sceneTrack || !sceneTrack.def.sync || !videoEl) return;
-        if (!Number.isFinite(videoEl.currentTime)) return;
-        const buf = sceneTrack.buf;
-        // If playback rate jumped (fast-forward) re-sync by restarting at video position
-        // We detect a >0.5 s phase drift to avoid seeking on minor float differences
-        const ac = getCtx();
-        // Approximate audio phase: AudioBufferSource doesn't expose currentTime,
-        // so we track it via a reference stored at start
-        // (drift correction only for synced tracks via watchdog below)
-    }
-    // Watchdog: called from render() when on a synced loop segment.
-    // Restarts audio in-phase with the video if drift > threshold.
-    let lastSyncCheck = 0;
-
-    function syncWatchdog(videoEl) {
-        if (!sceneTrack || !sceneTrack.def.sync || !videoEl) return;
-        if (!Number.isFinite(videoEl.currentTime) || !videoEl.duration) return;
-        const now = performance.now();
-        if (now - lastSyncCheck < 1500) return; // only check every 1.5 s
-        lastSyncCheck = now;
-        // If audio src was restarted from wrong offset we'll just let it drift;
-        // for a fully correct sync we restart the source to match video phase.
-        const ac = getCtx();
-        const buf = sceneTrack.buf;
-        // We track our own "audio started at" wall-clock reference
-        if (sceneTrack._startedAtAcTime !== undefined) {
-            const elapsed = ac.currentTime - sceneTrack._startedAtAcTime;
-            const audioPhase = (sceneTrack._startOffset + elapsed) % buf.duration;
-            const videoPhase = videoEl.currentTime % buf.duration;
-            const drift = Math.abs(audioPhase - videoPhase);
-            if (drift > 0.12) { // > 120 ms drift → re-sync
-                try {
-                    sceneTrack.src.stop();
-                } catch (_) { }
-                const gain = sceneTrack.gain;
-                const offset = videoEl.currentTime % buf.duration;
-                const src = makeLoop(buf, gain, offset);
-                sceneTrack.src = src;
-                sceneTrack._startedAtAcTime = ac.currentTime;
-                sceneTrack._startOffset = offset;
-            }
-        }
-    }
-    // Override makeLoop to record ac start time for the watchdog
-    const _origMakeLoop = makeLoop;
-
-    function makeLoopTracked(buf, gainNode, startOffset) {
-        const src = getCtx().createBufferSource();
-        src.buffer = buf;
-        src.loop = true;
-        src.connect(gainNode);
-        src.start(0, startOffset % buf.duration);
-        return src;
-    }
-    // Called whenever loop restarts (handleLoopEnded → restartLoop)
-    function onLoopRestart(videoEl) {
-        if (!sceneTrack || !sceneTrack.def.sync) return;
-        // Restart audio from offset=0 to match video restart
-        const buf = sceneTrack.buf;
-        const gain = sceneTrack.gain;
-        try {
-            sceneTrack.src.stop();
-        } catch (_) { }
-        const ac = getCtx();
-        const src = makeLoopTracked(buf, gain, 0);
-        sceneTrack.src = src;
-        sceneTrack._startedAtAcTime = ac.currentTime;
-        sceneTrack._startOffset = 0;
-    }
-    // Duck/unduck scene audio during fast-forward scroll
-    function duck() {
-        if (!sceneTrack) return;
-        if (isDucked) return;
-        isDucked = true;
-        ramp(sceneTrack.gain, DUCK_VOL, 0.15);
-        if (duckTimer) clearTimeout(duckTimer);
-    }
-
-    function unduck() {
-        if (!isDucked) return;
-        isDucked = false;
-        if (sceneTrack) ramp(sceneTrack.gain, SCENE_VOL, 0.4);
-    }
-
-    function scheduledUnduck() {
-        if (duckTimer) clearTimeout(duckTimer);
-        duckTimer = setTimeout(unduck, SCENE_IDLE_MS);
-    }
-    // First user gesture unlocks AudioContext and resumes audio graph
-    function unlock() {
-        if (unlocked) return;
-        unlocked = true;
-        getCtx().resume().then(() => {
-            // Background music removed per Issue #10.
-            // If currently on an audio-enabled scene, trigger it
-            if (typeof segments !== "undefined" && typeof activeSegment !== "undefined") {
-                const seg = segments[activeSegment];
-                if (seg && typeof videos !== "undefined" && videos[activeVideo]) {
-                    onSegment(seg.file, videos[activeVideo]);
-                }
-            }
-        });
-    }
-
-    function destroy() {
-        stopScene();
-        if (ctx && ctx.state !== "closed") {
-            try {
-                ctx.close();
-            } catch (_) { }
-            ctx = null;
-        }
-        unlocked = false;
-    }
-
-    return {
-        unlock,
-        onSegment,
-        onLoopRestart,
-        syncWatchdog,
-        duck,
-        scheduledUnduck,
-        destroy
-    };
-})();
-// ─── END AUDIO MANAGER ───────────────────────────────────────────────────
