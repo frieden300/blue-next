@@ -19,13 +19,7 @@ import {
   SUBCAT_LABEL,
   normalizeSubcategory,
 } from "@/lib/constants/marketplace";
-
-interface ListingImage {
-  id?: string;
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
+import type { ListingImage } from "@/types/marketplace";
 
 export interface ExperienceSession {
   id: string;

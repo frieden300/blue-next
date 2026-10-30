@@ -1,14 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { sortListingImages } from "@/lib/utils/images";
+import type { ListingImage as GalleryImage } from "@/types/marketplace";
 
-export interface GalleryImage {
-  id?: string;
-  url: string;
-  alt_text?: string | null;
-  sort_order?: number | null;
-  created_at?: string | null;
-}
+export type { GalleryImage };
 
 interface Props {
   images?: GalleryImage[] | null;
@@ -34,9 +30,7 @@ export default function ListingImageGallery({
   badge,
 }: Props) {
   // Sort images: sort_order ASC, then by created_at / index
-  const sortedImages = (images || [])
-    .slice()
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const sortedImages = sortListingImages(images);
 
   const [activeIndex, setActiveIndex] = useState(0);
 

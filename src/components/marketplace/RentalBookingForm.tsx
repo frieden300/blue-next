@@ -2,19 +2,14 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { confirmRentalBookingAction, checkRentalAvailabilityAction } from "@/app/rentals/actions";
+import { todayStr, tomorrowStr, calculateRentalDays, formatDisplayDate } from "@/lib/utils/dates";
+import { calculateRentalPricing, formatINR } from "@/lib/utils/pricing";
 
 interface RentalBookingFormProps {
   listingId: string;
   rentalTitle: string;
   dailyRate: number;
   inventoryCount?: number;
-}
-
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
-}
-function tomorrowStr() {
-  return new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
 }
 
 export default function RentalBookingForm({
@@ -45,13 +40,12 @@ export default function RentalBookingForm({
   }>({ checking: false, available: true, remaining: inventoryCount });
 
   // Live calculation for display
-  const pickup = new Date(startDate);
-  const ret = new Date(endDate);
-  const diffMs = ret.getTime() - pickup.getTime();
-  const diffDays = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-  const rentalTotal = diffDays * dailyRate * quantity;
-  const depositAmount = Math.round(dailyRate * 1.5) * quantity;
-  const grandTotal = rentalTotal + depositAmount;
+  const diffDays = calculateRentalDays(startDate, endDate);
+  const { rentalTotal, depositAmount, grandTotal } = calculateRentalPricing(
+    dailyRate,
+    diffDays,
+    quantity
+  );
 
   // Real-time server-side availability check
   useEffect(() => {
@@ -147,16 +141,16 @@ export default function RentalBookingForm({
           </div>
           <div className="rental-conf-row">
             <span>Rental Cost</span>
-            <span>₹{result.rentalTotal.toLocaleString("en-IN")}</span>
+            <span>{formatINR(result.rentalTotal)}</span>
           </div>
           <div className="rental-conf-row">
             <span>Refundable Deposit</span>
-            <span>₹{result.depositAmount.toLocaleString("en-IN")}</span>
+            <span>{formatINR(result.depositAmount)}</span>
           </div>
           <div className="rental-conf-divider" />
           <div className="rental-conf-row rental-conf-total">
             <span>Total</span>
-            <strong>₹{(result.rentalTotal + result.depositAmount).toLocaleString("en-IN")}</strong>
+            <strong>{formatINR(result.rentalTotal + result.depositAmount)}</strong>
           </div>
         </div>
         <p className="rental-conf-ref">Booking ref: <code>{result.bookingId}</code></p>
@@ -295,7 +289,7 @@ export default function RentalBookingForm({
                     <p style={{ margin: "0 0 8px", fontSize: "12px", color: "var(--muted)" }}>
                       💡 Earliest pickup for {quantity} unit{quantity > 1 ? "s" : ""} ({diffDays} day{diffDays > 1 ? "s" : ""}):{" "}
                       <strong style={{ color: "var(--blue)" }}>
-                        {new Date(availState.nextAvailableDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                        {formatDisplayDate(availState.nextAvailableDate)}
                       </strong>
                     </p>
                     <button
@@ -335,7 +329,7 @@ export default function RentalBookingForm({
           <div className="rental-cost-breakdown">
             <div className="cost-row">
               <span>Daily Rate</span>
-              <span>₹{dailyRate.toLocaleString("en-IN")} / day</span>
+              <span>{formatINR(dailyRate)} / day</span>
             </div>
             <div className="cost-row">
               <span>Duration</span>
@@ -347,16 +341,16 @@ export default function RentalBookingForm({
             </div>
             <div className="cost-row">
               <span>Rental Cost</span>
-              <span>₹{rentalTotal.toLocaleString("en-IN")}</span>
+              <span>{formatINR(rentalTotal)}</span>
             </div>
             <div className="cost-row">
               <span>Refundable Deposit</span>
-              <span>₹{depositAmount.toLocaleString("en-IN")}</span>
+              <span>{formatINR(depositAmount)}</span>
             </div>
             <div className="cost-divider" />
             <div className="cost-row total-row">
               <span>Estimated Total</span>
-              <strong className="total-highlight">₹{grandTotal.toLocaleString("en-IN")}</strong>
+              <strong className="total-highlight">{formatINR(grandTotal)}</strong>
             </div>
           </div>
         )}
@@ -372,7 +366,7 @@ export default function RentalBookingForm({
             ? "Select valid dates"
             : availState.available === false
             ? "Insufficient units for selected dates"
-            : `Confirm Rental Booking — ₹${grandTotal.toLocaleString("en-IN")}`}
+            : `Confirm Rental Booking — ${formatINR(grandTotal)}`}
         </button>
 
         <p className="demo-disclaimer-note">

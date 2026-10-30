@@ -15,6 +15,8 @@ import {
   SUBCAT_LABEL,
   normalizeSubcategory,
 } from "@/lib/constants/marketplace";
+import type { ListingImage } from "@/types/marketplace";
+import { sortListingImages } from "@/lib/utils/images";
 
 interface Application {
   id: string;
@@ -30,13 +32,6 @@ interface Application {
   reviewed_at: string | null;
 }
 
-interface ListingImage {
-  id?: string;
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
-
 function AdminListingCardMedia({
   images,
   title,
@@ -44,7 +39,7 @@ function AdminListingCardMedia({
   images?: ListingImage[];
   title: string;
 }) {
-  const sorted = (images || []).slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const sorted = sortListingImages(images);
   const [idx, setIdx] = useState(0);
   const current = sorted[idx] ?? sorted[0];
 
@@ -407,10 +402,6 @@ function ListingCard({ listing }: { listing: Listing }) {
   const isPending = listing.status === "pending";
   const isActive = listing.status === "active";
   const isPaused = listing.status === "paused";
-
-  const img = listing.listing_images
-    ?.slice()
-    .sort((a, b) => a.sort_order - b.sort_order)[0];
 
   async function handleApprove() {
     setProcessing(true);

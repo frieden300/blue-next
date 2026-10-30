@@ -1,6 +1,5 @@
-export function formatINR(amount: number): string {
-  return `₹${Number(amount).toLocaleString("en-IN")}`;
-}
+import { formatINR } from "@/lib/utils/pricing";
+export { formatINR };
 
 export interface PriceDisplayProps {
   amount: number;

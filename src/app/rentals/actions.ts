@@ -2,6 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isValidUUID, isValidBookingQuantity } from "@/lib/utils/validation";
+import { calculateRentalDays } from "@/lib/utils/dates";
 
 export interface RentalBookingInput {
   listingId: string;
@@ -30,8 +32,12 @@ export async function confirmRentalBookingAction(
     return { error: "Missing required booking fields." };
   }
 
+  if (!isValidUUID(listingId)) {
+    return { error: "Invalid listing ID format." };
+  }
+
   const requestedQty = Number(quantity);
-  if (!Number.isInteger(requestedQty) || requestedQty < 1 || requestedQty > 50) {
+  if (!isValidBookingQuantity(requestedQty, 1, 50)) {
     return { error: "Quantity must be a valid whole number between 1 and 50." };
   }
 
@@ -50,9 +56,7 @@ export async function confirmRentalBookingAction(
     return { error: "Return date must be after the pickup date." };
   }
 
-  const durationDays = Math.ceil(
-    (ret.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  const durationDays = calculateRentalDays(pickupDate, returnDate);
 
   if (durationDays < 1 || durationDays > 365) {
     return { error: "Rental duration must be between 1 and 365 days." };
@@ -122,7 +126,7 @@ export async function checkRentalAvailabilityAction(
   returnDate: string,
   quantity = 1
 ): Promise<RentalAvailabilityResult> {
-  if (!listingId || !pickupDate || !returnDate) {
+  if (!isValidUUID(listingId) || !pickupDate || !returnDate) {
     return { available: false, error: "Missing required date fields." };
   }
 

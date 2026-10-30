@@ -3,14 +3,16 @@ import { connection } from "next/server";
 import SiteHeader from "@/components/layout/SiteHeader";
 import SiteFooter from "@/components/layout/SiteFooter";
 import { createClient } from "@/lib/supabase/server";
-import { CATEGORY_LABELS, type Experience } from "../page";
+import { CATEGORY_LABELS } from "../page";
 import Link from "next/link";
 import ExperienceBookingForm from "@/components/marketplace/ExperienceBookingForm";
 import ListingImageGallery from "@/components/marketplace/ListingImageGallery";
 import "../explore.css";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isValidUUID } from "@/lib/utils/validation";
+import { formatDurationHours } from "@/lib/utils/dates";
+import { formatINR } from "@/lib/utils/pricing";
+import type { ExperienceDetail } from "@/types/marketplace";
 
 const EXPERIENCE_CATEGORIES = ["experience", "diving", "snorkeling", "boat_tour", "guided"];
 
@@ -41,25 +43,13 @@ const WHAT_TO_EXPECT: Record<string, string[]> = {
   ],
 };
 
-interface ExperienceDetail extends Experience {
-  max_capacity?: number;
-  experience_sessions?: Array<{
-    id: string;
-    departure_time: string;
-    label: string | null;
-    max_capacity: number;
-    status: string;
-  }>;
-  partner_profiles?: { business_name: string; verified: boolean } | null;
-}
-
 /* ── Metadata ─────────────────────────────────────────────────── */
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await props.params;
 
-  if (!UUID_REGEX.test(id)) return { title: "Experience Not Found — BLUE" };
+  if (!isValidUUID(id)) return { title: "Experience Not Found — BLUE" };
 
   await connection();
 
@@ -114,7 +104,7 @@ async function ExperienceDetailContent(props: {
 
   const { id } = await props.params;
 
-  if (!UUID_REGEX.test(id)) return <ExperienceNotFound />;
+  if (!isValidUUID(id)) return <ExperienceNotFound />;
 
   const supabase = await createClient();
   const { data: item, error } = await supabase
@@ -142,13 +132,7 @@ function ExperienceDetailView({
   exp: ExperienceDetail;
 }) {
   const catLabel = CATEGORY_LABELS[exp.category] ?? exp.category;
-  const durationLabel = exp.duration_hours
-    ? exp.duration_hours < 1
-      ? `${exp.duration_hours * 60} min`
-      : exp.duration_hours === 1
-      ? "1 hr"
-      : `${exp.duration_hours} hrs`
-    : "Flexible";
+  const durationLabel = formatDurationHours(exp.duration_hours) ?? "Flexible";
 
   const diffClass = exp.difficulty ? `difficulty-${exp.difficulty}` : "";
   const whatToExpect = WHAT_TO_EXPECT[exp.category] ?? WHAT_TO_EXPECT.guided;
@@ -236,7 +220,7 @@ function ExperienceDetailView({
           <div className="exp-pricing-card">
             <span className="section-label">Price Per Person</span>
             <p className="exp-price-amount">
-              ₹{Number(exp.price_from).toLocaleString("en-IN")}
+              {formatINR(exp.price_from)}
             </p>
             <p className="exp-price-note">
               Includes certified guide, safety equipment &bull; Taxes at checkout

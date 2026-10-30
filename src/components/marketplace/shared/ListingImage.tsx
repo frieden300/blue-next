@@ -1,4 +1,5 @@
 import type { ListingImage as ListingImageType } from "@/types/marketplace";
+import { getMainListingImage } from "@/lib/utils/images";
 
 export interface ListingImageProps {
   images?: ListingImageType[] | null;
@@ -15,8 +16,7 @@ export default function ListingImage({
   imgClassName = "card-img",
   placeholderClassName = "card-img-placeholder",
 }: ListingImageProps) {
-  const sorted = images?.slice().sort((a, b) => a.sort_order - b.sort_order);
-  const mainImage = sorted?.[0];
+  const mainImage = getMainListingImage(images);
 
   if (mainImage) {
     return (

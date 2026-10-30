@@ -96,7 +96,7 @@ async function ApplyContent() {
         <p className="partner-kicker">BLUE MARKETPLACE</p>
         <h1 className="partner-heading">Become a <em>Partner</em></h1>
         <p className="partner-sub">
-          Join Blue's network of certified marine operators, gear sellers, and rental providers.
+          Join Blue&apos;s network of certified marine operators, gear sellers, and rental providers.
           Submit your application to get started.
         </p>
       </div>

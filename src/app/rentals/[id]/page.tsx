@@ -8,42 +8,17 @@ import Link from "next/link";
 import ListingImageGallery from "@/components/marketplace/ListingImageGallery";
 import "../rentals.css";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isValidUUID } from "@/lib/utils/validation";
+import { formatINR } from "@/lib/utils/pricing";
+import type { RentalDetail, ListingImage, PartnerProfile } from "@/types/marketplace";
 
-interface ListingImage {
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
-
-interface PartnerProfile {
-  business_name: string;
-  location: string | null;
-  verified: boolean;
-  description: string | null;
-}
-
-interface RentalDetail {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  price_from: number;
-  duration_hours: number | null;
-  status: string;
-  difficulty: string | null;
-  created_at: string;
-  inventory_count?: number;
-  partner_profiles?: PartnerProfile | null;
-  listing_images?: ListingImage[];
-}
+export type { RentalDetail, ListingImage, PartnerProfile };
 
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await props.params;
-  if (!UUID_REGEX.test(id)) {
+  if (!isValidUUID(id)) {
     return { title: "Rental Not Found — BLUE" };
   }
 
@@ -101,7 +76,7 @@ async function RentalDetailContent(props: {
   const { id } = await props.params;
 
   // Gracefully handle invalid UUIDs before querying Supabase
-  if (!UUID_REGEX.test(id)) {
+  if (!isValidUUID(id)) {
     return <RentalNotFoundScreen />;
   }
 
@@ -211,7 +186,7 @@ async function RentalDetailContent(props: {
             <span className="section-label">Rental Rate</span>
             <div className="rental-rate-display">
               <span className="rental-rate-num">
-                ₹{Number(rental.price_from).toLocaleString("en-IN")}
+                {formatINR(rental.price_from)}
               </span>
               <span className="rental-rate-unit"> / calendar day</span>
             </div>

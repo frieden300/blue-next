@@ -5,6 +5,13 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import CancelBookingButton from "@/components/marketplace/CancelBookingButton";
+import { formatDisplayDate } from "@/lib/utils/dates";
+import { formatINR } from "@/lib/utils/pricing";
+import type {
+  Order,
+  RentalBooking,
+  ExperienceBooking,
+} from "@/types/bookings";
 import "./bookings.css";
 
 export const metadata = {
@@ -36,48 +43,6 @@ function BookingsLoading() {
       </div>
     </div>
   );
-}
-
-/* ── Types ─────────────────────────────────────────────────────── */
-interface OrderItem {
-  id: string;
-  title: string;
-  unit_price: number;
-  quantity: number;
-  image_url: string | null;
-}
-
-interface Order {
-  id: string;
-  status: string;
-  total_amount: number;
-  created_at: string;
-  order_items: OrderItem[];
-}
-
-interface RentalBooking {
-  id: string;
-  listing_title: string;
-  pickup_date: string;
-  return_date: string;
-  duration_days: number;
-  daily_rate: number;
-  rental_total: number;
-  deposit_amount: number;
-  quantity?: number;
-  status: string;
-  created_at: string;
-}
-
-interface ExperienceBooking {
-  id: string;
-  listing_title: string;
-  booking_date: string;
-  guests: number;
-  unit_price: number;
-  total_amount: number;
-  status: string;
-  created_at: string;
 }
 
 /* ── Main content ───────────────────────────────────────────────── */
@@ -191,7 +156,7 @@ async function BookingsContent() {
                     <div className="rental-booking-details">
                       <div className="rental-detail-row">
                         <span>Date</span>
-                        <span>{new Date(exp.booking_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <span>{formatDisplayDate(exp.booking_date)}</span>
                       </div>
                       <div className="rental-detail-row">
                         <span>Guests</span>
@@ -199,20 +164,18 @@ async function BookingsContent() {
                       </div>
                       <div className="rental-detail-row">
                         <span>Rate</span>
-                        <span>₹{Number(exp.unit_price).toLocaleString("en-IN")} / person</span>
+                        <span>{formatINR(Number(exp.unit_price))} / person</span>
                       </div>
                       <div className="rental-detail-divider" />
                       <div className="rental-detail-row rental-detail-total">
                         <span>Total</span>
-                        <strong>₹{Number(exp.total_amount).toLocaleString("en-IN")}</strong>
+                        <strong>{formatINR(Number(exp.total_amount))}</strong>
                       </div>
                     </div>
 
                     <div className="booking-card-footer">
                       <span className="booking-date">
-                        Reserved {new Date(exp.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric", month: "short", year: "numeric",
-                        })}
+                        Reserved {formatDisplayDate(exp.created_at)}
                       </span>
                       <span className="booking-ref-small">ref: {exp.id.slice(0, 8)}…</span>
                     </div>
@@ -258,11 +221,11 @@ async function BookingsContent() {
                           <div className="booking-item-info">
                             <p className="booking-item-title">{item.title}</p>
                             <p className="booking-item-meta">
-                              ₹{Number(item.unit_price).toLocaleString("en-IN")} × {item.quantity}
+                              {formatINR(Number(item.unit_price))} × {item.quantity}
                             </p>
                           </div>
                           <p className="booking-item-sub">
-                            ₹{(Number(item.unit_price) * item.quantity).toLocaleString("en-IN")}
+                            {formatINR(Number(item.unit_price) * item.quantity)}
                           </p>
                         </li>
                       ))}
@@ -270,12 +233,10 @@ async function BookingsContent() {
 
                     <div className="booking-card-footer">
                       <span className="booking-date">
-                        {new Date(order.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric", month: "short", year: "numeric",
-                        })}
+                        {formatDisplayDate(order.created_at)}
                       </span>
                       <span className="booking-total">
-                        Total: <strong>₹{Number(order.total_amount).toLocaleString("en-IN")}</strong>
+                        Total: <strong>{formatINR(Number(order.total_amount))}</strong>
                       </span>
                     </div>
                   </div>
@@ -313,11 +274,11 @@ async function BookingsContent() {
                       </div>
                       <div className="rental-detail-row">
                         <span>Pickup</span>
-                        <span>{new Date(rental.pickup_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <span>{formatDisplayDate(rental.pickup_date)}</span>
                       </div>
                       <div className="rental-detail-row">
                         <span>Return</span>
-                        <span>{new Date(rental.return_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <span>{formatDisplayDate(rental.return_date)}</span>
                       </div>
                       <div className="rental-detail-row">
                         <span>Duration</span>
@@ -325,24 +286,22 @@ async function BookingsContent() {
                       </div>
                       <div className="rental-detail-row">
                         <span>Rental Cost</span>
-                        <span>₹{Number(rental.rental_total).toLocaleString("en-IN")}</span>
+                        <span>{formatINR(Number(rental.rental_total))}</span>
                       </div>
                       <div className="rental-detail-row">
                         <span>Deposit</span>
-                        <span>₹{Number(rental.deposit_amount).toLocaleString("en-IN")}</span>
+                        <span>{formatINR(Number(rental.deposit_amount))}</span>
                       </div>
                       <div className="rental-detail-divider" />
                       <div className="rental-detail-row rental-detail-total">
                         <span>Total</span>
-                        <strong>₹{(Number(rental.rental_total) + Number(rental.deposit_amount)).toLocaleString("en-IN")}</strong>
+                        <strong>{formatINR(Number(rental.rental_total) + Number(rental.deposit_amount))}</strong>
                       </div>
                     </div>
 
                     <div className="booking-card-footer">
                       <span className="booking-date">
-                        Booked {new Date(rental.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric", month: "short", year: "numeric",
-                        })}
+                        Booked {formatDisplayDate(rental.created_at)}
                       </span>
                       <span className="booking-ref-small">ref: {rental.id.slice(0, 8)}…</span>
                     </div>

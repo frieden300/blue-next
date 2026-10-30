@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { updateDisplayNameAction, type ActionState } from "@/app/account/actions";
 
 interface UpdateProfileFormProps {
@@ -12,10 +12,13 @@ const initialState: ActionState = {};
 export default function UpdateProfileForm({ initialDisplayName }: UpdateProfileFormProps) {
   const [state, formAction, isPending] = useActionState(updateDisplayNameAction, initialState);
   const [name, setName] = useState(initialDisplayName);
+  const [prevInitialDisplayName, setPrevInitialDisplayName] = useState(initialDisplayName);
 
-  useEffect(() => {
+  // Sync state when initialDisplayName prop updates (e.g. after server action revalidation)
+  if (initialDisplayName !== prevInitialDisplayName) {
+    setPrevInitialDisplayName(initialDisplayName);
     setName(initialDisplayName);
-  }, [initialDisplayName]);
+  }
 
   return (
     <form action={formAction} className="auth-form">

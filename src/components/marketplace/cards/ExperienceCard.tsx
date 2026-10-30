@@ -4,19 +4,14 @@ import ListingImage from "@/components/marketplace/shared/ListingImage";
 import PriceDisplay from "@/components/marketplace/shared/PriceDisplay";
 import ListingBadge from "@/components/marketplace/shared/ListingBadge";
 import { EXPERIENCE_CATEGORY_LABELS } from "@/lib/constants/marketplace";
+import { formatDurationHours } from "@/lib/utils/dates";
 
 export interface ExperienceCardProps {
   exp: Experience;
 }
 
 export default function ExperienceCard({ exp }: ExperienceCardProps) {
-  const durationLabel = exp.duration_hours
-    ? exp.duration_hours < 1
-      ? `${exp.duration_hours * 60} min`
-      : exp.duration_hours === 1
-      ? "1 hr"
-      : `${exp.duration_hours} hrs`
-    : null;
+  const durationLabel = formatDurationHours(exp.duration_hours);
 
   const catLabel = EXPERIENCE_CATEGORY_LABELS[exp.category] ?? exp.category;
 

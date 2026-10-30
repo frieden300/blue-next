@@ -7,30 +7,16 @@ import {
   getExperienceSessionsAvailabilityAction,
   type SessionAvailabilityItem,
 } from "@/app/explore/actions";
-
-interface SessionItem {
-  id: string;
-  departure_time: string;
-  label: string | null;
-  max_capacity: number;
-  status: string;
-}
+import { todayStr, tomorrowStr, formatDisplayDate } from "@/lib/utils/dates";
+import { calculateExperienceTotal, formatINR } from "@/lib/utils/pricing";
+import type { ExperienceSession } from "@/types/marketplace";
 
 interface ExperienceBookingFormProps {
   listingId: string;
   listingTitle: string;
   unitPrice: number;
   maxCapacity?: number;
-  initialSessions?: SessionItem[];
-}
-
-function tomorrowStr() {
-  const d = new Date(Date.now() + 86_400_000);
-  return d.toISOString().split("T")[0];
-}
-
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  initialSessions?: ExperienceSession[];
 }
 
 export default function ExperienceBookingForm({
@@ -54,7 +40,7 @@ export default function ExperienceBookingForm({
     return initialSessions.map((s) => ({
       sessionId: s.id,
       departureTime: s.departure_time,
-      label: s.label,
+      label: s.label ?? null,
       maxCapacity: s.max_capacity,
       bookedGuests: 0,
       availableSpots: s.max_capacity,
@@ -77,7 +63,7 @@ export default function ExperienceBookingForm({
     departureTime?: string;
   } | null>(null);
 
-  const totalAmount = unitPrice * guests;
+  const totalAmount = calculateExperienceTotal(unitPrice, guests);
 
   // Fetch live session availability whenever booking date changes
   useEffect(() => {
@@ -174,7 +160,7 @@ export default function ExperienceBookingForm({
           </div>
           <div className="rental-conf-row">
             <span>Date</span>
-            <span>{new Date(bookingDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+            <span>{formatDisplayDate(bookingDate)}</span>
           </div>
           {result.departureTime && (
             <div className="rental-conf-row">
@@ -188,12 +174,12 @@ export default function ExperienceBookingForm({
           </div>
           <div className="rental-conf-row">
             <span>Rate</span>
-            <span>₹{result.unitPrice.toLocaleString("en-IN")} / person</span>
+            <span>{formatINR(result.unitPrice)} / person</span>
           </div>
           <div className="rental-conf-divider" />
           <div className="rental-conf-row rental-conf-total">
             <span>Total Confirmed</span>
-            <strong>₹{result.totalAmount.toLocaleString("en-IN")}</strong>
+            <strong>{formatINR(result.totalAmount)}</strong>
           </div>
         </div>
         <p className="rental-conf-ref">Booking ref: <code>{result.bookingId}</code></p>
@@ -404,13 +390,13 @@ export default function ExperienceBookingForm({
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
             <span>Rate</span>
-            <span>₹{unitPrice.toLocaleString("en-IN")} × {guests} {guests === 1 ? "guest" : "guests"}</span>
+            <span>{formatINR(unitPrice)} × {guests} {guests === 1 ? "guest" : "guests"}</span>
           </div>
           <div style={{ height: "1px", background: "rgba(130, 217, 237, 0.12)", margin: "2px 0" }} />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: "13px", color: "var(--white)", fontWeight: 500 }}>Total</span>
             <strong style={{ fontSize: "17px", color: "var(--blue)", letterSpacing: "-0.01em" }}>
-              ₹{totalAmount.toLocaleString("en-IN")}
+              {formatINR(totalAmount)}
             </strong>
           </div>
         </div>
@@ -428,7 +414,7 @@ export default function ExperienceBookingForm({
         >
           {isPending
             ? "Booking Experience…"
-            : `Book This Experience — ₹${totalAmount.toLocaleString("en-IN")}`}
+            : `Book This Experience — ${formatINR(totalAmount)}`}
         </button>
 
         <p className="exp-book-note" style={{ margin: 0 }}>

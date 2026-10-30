@@ -2,9 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isValidUUID, isValidBookingQuantity } from "@/lib/utils/validation";
 
 export interface ExperienceBookingInput {
   listingId: string;
@@ -34,7 +32,7 @@ export async function confirmExperienceBookingAction(
   }
 
   // Reject non-UUID listing references
-  if (!UUID_REGEX.test(listingId)) {
+  if (!isValidUUID(listingId)) {
     return {
       error: "Invalid listing reference. Experience booking requires an active database listing.",
     };
@@ -50,7 +48,7 @@ export async function confirmExperienceBookingAction(
   if (dateObj < today) {
     return { error: "Booking date cannot be in the past." };
   }
-  if (!Number.isInteger(guests) || guests < 1 || guests > 50) {
+  if (!isValidBookingQuantity(guests)) {
     return { error: "Number of guests must be a valid whole number between 1 and 50." };
   }
 
@@ -114,7 +112,7 @@ export async function getExperienceSessionsAvailabilityAction(
   listingId: string,
   bookingDate: string
 ): Promise<{ sessions?: SessionAvailabilityItem[]; error?: string }> {
-  if (!UUID_REGEX.test(listingId)) {
+  if (!isValidUUID(listingId)) {
     return { sessions: [] };
   }
 

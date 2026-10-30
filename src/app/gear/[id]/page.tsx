@@ -8,42 +8,18 @@ import Link from "next/link";
 import ListingImageGallery from "@/components/marketplace/ListingImageGallery";
 import "../gear.css";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isValidUUID } from "@/lib/utils/validation";
+import { getMainListingImage } from "@/lib/utils/images";
+import { formatINR } from "@/lib/utils/pricing";
+import type { GearDetail, ListingImage, PartnerProfile } from "@/types/marketplace";
 
-interface ListingImage {
-  url: string;
-  alt_text: string | null;
-  sort_order: number;
-}
-
-interface PartnerProfile {
-  business_name: string;
-  location: string | null;
-  verified: boolean;
-  description: string | null;
-}
-
-interface GearDetail {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  price_from: number;
-  status: string;
-  difficulty: string | null;
-  duration_hours: number | null;
-  stock_count?: number;
-  created_at: string;
-  partner_profiles?: PartnerProfile | null;
-  listing_images?: ListingImage[];
-}
+export type { GearDetail, ListingImage, PartnerProfile };
 
 export async function generateMetadata(props: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await props.params;
-  if (!UUID_REGEX.test(id)) {
+  if (!isValidUUID(id)) {
     return { title: "Product Not Found — BLUE" };
   }
 
@@ -101,7 +77,7 @@ async function GearDetailContent(props: {
   const { id } = await props.params;
 
   // Gracefully handle invalid UUIDs before querying Supabase
-  if (!UUID_REGEX.test(id)) {
+  if (!isValidUUID(id)) {
     return <GearNotFoundScreen />;
   }
 
@@ -140,10 +116,7 @@ async function GearDetailContent(props: {
   }
 
   const gear = item as unknown as GearDetail;
-  const sortedImages = gear.listing_images?.sort(
-    (a, b) => a.sort_order - b.sort_order
-  );
-  const primaryImage = sortedImages?.[0];
+  const primaryImage = getMainListingImage(gear.listing_images);
 
   return (
     <div className="product-detail-page">
@@ -209,7 +182,7 @@ async function GearDetailContent(props: {
           <div className="product-pricing-card">
             <span className="section-label">Price</span>
             <p className="product-price-amount">
-              ₹{Number(gear.price_from).toLocaleString("en-IN")}
+              {formatINR(gear.price_from)}
             </p>
             <p className="product-price-note">
               Price includes standard expedition warranty &bull; Taxes calculated at simulated checkout

@@ -22,7 +22,6 @@
     };
 
     const FADE_S = 0.55;
-    const BG_VOL = 0.18;
     const SCENE_VOL = 0.82;
     const DUCK_VOL = 0.25;
     const SCENE_IDLE_MS = 350;
@@ -90,7 +89,7 @@
             setTimeout(() => {
                 try {
                     if (old.src) old.src.stop();
-                } catch (_) { }
+                } catch { }
                 if (cb) cb();
             }, FADE_S * 1000 + 50);
         }
@@ -150,7 +149,7 @@
                 if (drift > 0.12) {
                     try {
                         sceneTrack.src.stop();
-                    } catch (_) { }
+                    } catch { }
                     const gain = sceneTrack.gain;
                     const offset = videoEl.currentTime % buf.duration;
                     const src = makeLoop(buf, gain, offset);
@@ -167,7 +166,7 @@
             const gain = sceneTrack.gain;
             try {
                 sceneTrack.src.stop();
-            } catch (_) { }
+            } catch { }
             const ac = getCtx();
             if (!ac || ac.state === "closed") return;
             const src = makeLoopTracked(buf, gain, 0);
@@ -219,13 +218,13 @@
                 try {
                     if (sceneTrack.src) sceneTrack.src.stop();
                     if (sceneTrack.gain) sceneTrack.gain.disconnect();
-                } catch (_) { }
+                } catch { }
                 sceneTrack = null;
             }
             if (ctx && ctx.state !== "closed") {
                 try {
                     ctx.close();
-                } catch (_) { }
+                } catch { }
                 ctx = null;
             }
             unlocked = false;
@@ -255,7 +254,7 @@
                 const item = this.listeners[i];
                 try {
                     item.target.removeEventListener(item.type, item.handler, item.options);
-                } catch (_) { }
+                } catch { }
             }
             this.listeners = [];
         }
@@ -392,29 +391,24 @@
     let activeSegment = 0;
     let target = 0;
     let smooth = 0;
-    let currentPassageFrame = 0;
-    let lastFrameStepTime = 0;
     let lastInputAt = -Infinity;
     const PROMPT_IDLE_FADE_MS = 600;
-    let lastLoopForwardAt = -Infinity;
     let allowLoopTransition = false;
     let pendingLoopNext = null;
     let loadToken = 0;
     let touchY = null;
-    let wheelAccumulator = 0;
     let holdMode = false;
     const HOLD_PLAYBACK_RATE = 2.5;
 
     // ─── LOOP PLAYBACK & SCROLL FAST-FORWARD TUNING ───────────────────────────
-    const V1L_BASE_PLAYBACK_RATE = 1.2;
+    const V1L_BASE_PLAYBACK_RATE = 1.4;
     const OTHER_LOOPS_BASE_PLAYBACK_RATE = 1.0;
     const V1L_SCROLL_SPEED_MULTIPLIER = 4.0;
     const DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER = 2.0;
 
     let loopScrollBoost = 0;
-    const SCROLL_IDLE_MS = 260;
 
-    const V1L_LOOP_EXIT_WINDOW_S = 0.3;
+    const V1L_LOOP_EXIT_WINDOW_S = 0.6;
     const OTHER_LOOPS_EXIT_WINDOW_S = 0.3;
 
     let copyAnimTimer = null;
@@ -427,7 +421,7 @@
 
     const INPUT_DISTANCE_PER_VIEWPORT = 1.0;
     const WHEEL_SENSITIVITY = 0.015;
-    const TOUCH_SENSITIVITY = 0.2;
+    const TOUCH_SENSITIVITY = 0.6;
     const TOUCH_HOLD_DELAY_MS = 380;
     const TOUCH_MOVE_CANCEL_DIST = 10;
 
@@ -450,7 +444,7 @@
         if (Math.abs(video.currentTime - targetTime) < 0.015) return;
         try {
             video.currentTime = targetTime;
-        } catch (_) { }
+        } catch { }
     }
 
     function segmentAt(progress) {
@@ -474,7 +468,7 @@
 
     function updateCopy(index) {
         const segment = segments[index];
-        const cta = document.querySelector("#journeyCta");
+        const cta = journeyCta || document.querySelector("#journeyCta");
         if (cta) {
             cta.classList.toggle("is-visible", segment.stage === 0 || segment.stage === 6);
             const ctaTitle = cta.querySelector(".journey-cta-title");
@@ -527,7 +521,7 @@
         video.defaultPlaybackRate = baseRate;
         try {
             video.currentTime = 0;
-        } catch (_) { }
+        } catch { }
         video.play().catch(() => { });
         audioMgr.onLoopRestart(video);
     }
@@ -585,12 +579,10 @@
                     if (enteringBackward && Number.isFinite(nextVideo.duration) && nextVideo.duration > 0) {
                         const finalFrameTime = Math.max(0, Math.floor(nextVideo.duration * 24 - 1) / 24);
                         nextVideo.currentTime = finalFrameTime;
-                        currentPassageFrame = Math.round(finalFrameTime * 24);
                     } else {
                         nextVideo.currentTime = 0;
-                        currentPassageFrame = 0;
                     }
-                } catch (_) { }
+                } catch { }
             } else {
                 nextVideo.loop = true;
                 const baseRate = segment.stage === 0 ? V1L_BASE_PLAYBACK_RATE : OTHER_LOOPS_BASE_PLAYBACK_RATE;
@@ -696,7 +688,7 @@
             if (video.ended) {
                 try {
                     video.currentTime = 0;
-                } catch (_) { }
+                } catch { }
             }
             video.play().catch(() => { });
         }
@@ -718,7 +710,6 @@
         if (destroyed || !isActive) return false;
         const seg = segments[activeSegment];
         if (deltaPixels > 0 && seg && seg.type === "loop" && !holdMode && pendingLoopNext === null) {
-            lastLoopForwardAt = performance.now();
             lastInputAt = performance.now();
             if (activeSegment + 1 >= segments.length || !loopExitWindowOpen()) return false;
             pendingLoopNext = activeSegment + 1;
@@ -749,7 +740,6 @@
                 const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                 const impulse = (Math.abs(delta) / 100) * (multiplier * 0.45);
                 loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
-                lastLoopForwardAt = performance.now();
                 lastInputAt = performance.now();
                 audioMgr.duck();
                 audioMgr.scheduledUnduck();
@@ -811,7 +801,6 @@
                 const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                 const impulse = (Math.abs(deltaY) / 30) * (multiplier * 0.45);
                 loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
-                lastLoopForwardAt = performance.now();
                 lastInputAt = performance.now();
                 audioMgr.duck();
                 audioMgr.scheduledUnduck();
@@ -853,7 +842,6 @@
                 const isStage0 = currentSeg.stage === 0;
                 const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                 loopScrollBoost = Math.min(15.0, loopScrollBoost + multiplier * 0.75);
-                lastLoopForwardAt = performance.now();
                 lastInputAt = performance.now();
                 audioMgr.duck();
                 audioMgr.scheduledUnduck();
@@ -959,7 +947,6 @@
                 const frameDuration = 1 / 24;
                 const targetFrame = Math.round(time / frameDuration);
                 const displayedFrame = Math.round(video.currentTime / frameDuration);
-                currentPassageFrame = displayedFrame;
                 if (!video.seeking && displayedFrame !== targetFrame) {
                     const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
                     const nextTargetTime = nextFrame * frameDuration;
@@ -1030,7 +1017,7 @@
                         v.onloadedmetadata = null;
                         v.removeAttribute("src");
                         v.load();
-                    } catch (_) { }
+                    } catch { }
                 }
             });
         }
@@ -1070,15 +1057,11 @@
         activeSegment = 0;
         target = 0;
         smooth = 0;
-        currentPassageFrame = 0;
-        lastFrameStepTime = 0;
         lastInputAt = -Infinity;
-        lastLoopForwardAt = -Infinity;
         allowLoopTransition = false;
         pendingLoopNext = null;
         loadToken = 0;
         touchY = null;
-        wheelAccumulator = 0;
         holdMode = false;
         loopScrollBoost = 0;
         lastPromptOpacity = "";
@@ -1088,9 +1071,6 @@
             if (!v) return;
             eventManager.add(v, "seeked", () => {
                 if (destroyed || !isActive) return;
-                if (v === videos[activeVideo] && segments[activeSegment] && segments[activeSegment].type === "passage") {
-                    currentPassageFrame = Math.round(v.currentTime * 24);
-                }
             });
         });
 
@@ -1153,7 +1133,6 @@
                     const isStage0 = currentSeg.stage === 0;
                     const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                     loopScrollBoost = Math.min(15.0, loopScrollBoost + multiplier * 0.9);
-                    lastLoopForwardAt = performance.now();
                     lastInputAt = performance.now();
                     audioMgr.duck();
                     audioMgr.scheduledUnduck();

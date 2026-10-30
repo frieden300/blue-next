@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isValidUUID } from "@/lib/utils/validation";
 
 export interface CancelBookingResult {
   success?: boolean;
@@ -14,6 +15,9 @@ export async function cancelBookingAction(
 ): Promise<CancelBookingResult> {
   if (!id || !type) {
     return { error: "Missing required cancel parameters." };
+  }
+  if (!isValidUUID(id)) {
+    return { error: "Invalid booking ID format." };
   }
 
   const supabase = await createClient();

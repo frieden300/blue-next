@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { isValidUUID, isValidBookingQuantity } from "@/lib/utils/validation";
 
 export interface CartItemInput {
   listingId: string;
@@ -44,10 +45,10 @@ export async function confirmOrderAction(
 
   // Validate quantities
   for (const item of items) {
-    if (!item.listingId || typeof item.listingId !== "string") {
+    if (!isValidUUID(item.listingId)) {
       return { error: "Invalid item in cart." };
     }
-    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 50) {
+    if (!isValidBookingQuantity(item.quantity, 1, 50)) {
       return { error: `Invalid quantity for "${item.title}".` };
     }
   }
