@@ -19,15 +19,9 @@ import {
   SUBCAT_LABEL,
   normalizeSubcategory,
 } from "@/lib/constants/marketplace";
-import type { ListingImage } from "@/types/marketplace";
+import type { ListingImage, ExperienceSession } from "@/types/marketplace";
 
-export interface ExperienceSession {
-  id: string;
-  departure_time: string;
-  max_capacity: number;
-  label?: string | null;
-  status: "active" | "inactive";
-}
+export type { ExperienceSession };
 
 interface Listing {
   id: string;
@@ -242,12 +236,26 @@ function CardImageCarousel({
 }
 
 export default function PartnerDashboardClient({ partnerProfile, listings }: Props) {
+  const [sessionOverrides, setSessionOverrides] = useState<Record<string, ExperienceSession[]>>({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editListing, setEditListing] = useState<Listing | null>(null);
   const [managingSessionsListing, setManagingSessionsListing] = useState<Listing | null>(null);
   const [resubmitting, setResubmitting] = useState<string | null>(null);
   const [deletingListingId, setDeletingListingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const displayListings = listings.map((l) =>
+    sessionOverrides[l.id] ? { ...l, experience_sessions: sessionOverrides[l.id] } : l
+  );
+
+  const handleSessionsUpdated = (listingId: string, updatedSessions: ExperienceSession[]) => {
+    setSessionOverrides((prev) => ({ ...prev, [listingId]: updatedSessions }));
+    setManagingSessionsListing((prev) =>
+      prev && prev.id === listingId
+        ? { ...prev, experience_sessions: updatedSessions }
+        : prev
+    );
+  };
 
   const availableCats = partnerProfile.service_types.flatMap(
     (s) => SERVICE_TO_CATS[s] ?? []
@@ -305,7 +313,7 @@ export default function PartnerDashboardClient({ partnerProfile, listings }: Pro
       <div className="pdash-section">
         <h2 className="pdash-section-title">My Listings</h2>
 
-        {listings.length === 0 ? (
+        {displayListings.length === 0 ? (
           <div className="pdash-empty">
             <div className="pdash-empty-icon" aria-hidden="true">🌊</div>
             <h3 className="pdash-empty-title">No listings yet</h3>
@@ -321,7 +329,7 @@ export default function PartnerDashboardClient({ partnerProfile, listings }: Pro
           </div>
         ) : (
           <div className="pdash-listing-grid">
-            {listings.map((listing) => (
+            {displayListings.map((listing) => (
               <article key={listing.id} className="pdash-listing-card">
                 <CardImageCarousel images={listing.listing_images} title={listing.title} />
 
@@ -474,6 +482,7 @@ export default function PartnerDashboardClient({ partnerProfile, listings }: Pro
         <ManageSessionsModal
           listing={managingSessionsListing}
           onClose={() => setManagingSessionsListing(null)}
+          onSessionsUpdated={handleSessionsUpdated}
         />
       )}
     </div>
@@ -1220,9 +1229,11 @@ function ListingFormModal({
 function ManageSessionsModal({
   listing,
   onClose,
+  onSessionsUpdated,
 }: {
   listing: Listing;
   onClose: () => void;
+  onSessionsUpdated?: (listingId: string, sessions: ExperienceSession[]) => void;
 }) {
   const [sessions, setSessions] = useState<ExperienceSession[]>(
     listing.experience_sessions ?? []
@@ -1231,6 +1242,7 @@ function ManageSessionsModal({
   const [newCapacity, setNewCapacity] = useState(listing.max_capacity ?? 10);
   const [newLabel, setNewLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [updatingSessionId, setUpdatingSessionId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -1252,40 +1264,55 @@ function ManageSessionsModal({
       setErrorMsg(res.error);
     } else {
       setSuccessMsg("Departure slot added successfully!");
-      setSessions((prev) => [
-        ...prev,
-        {
-          id: Math.random().toString(),
-          departure_time: newTime,
-          max_capacity: newCapacity,
-          label: newLabel || null,
-          status: "active",
-        },
-      ]);
+      if (res.session) {
+        const nextSessions: ExperienceSession[] = [...sessions, res.session];
+        setSessions(nextSessions);
+        onSessionsUpdated?.(listing.id, nextSessions);
+      }
       setNewLabel("");
     }
   };
 
   const handleToggleStatus = async (session: ExperienceSession) => {
-    const nextStatus = session.status === "active" ? "inactive" : "active";
+    const nextStatus: "active" | "inactive" =
+      session.status === "active" ? "inactive" : "active";
     setErrorMsg(null);
+    setSuccessMsg(null);
+    setUpdatingSessionId(session.id);
+
+    // Optimistic UI update
+    const optimisticSessions: ExperienceSession[] = sessions.map((s) =>
+      s.id === session.id ? { ...s, status: nextStatus } : s
+    );
+    setSessions(optimisticSessions);
+
     const res = await updateExperienceSessionAction(session.id, session.max_capacity, nextStatus);
+    setUpdatingSessionId(null);
+
     if (res.error) {
+      // Rollback on failure
+      const revertedSessions: ExperienceSession[] = sessions.map((s) =>
+        s.id === session.id ? { ...s, status: session.status } : s
+      );
+      setSessions(revertedSessions);
       setErrorMsg(res.error);
     } else {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === session.id ? { ...s, status: nextStatus } : s))
-      );
+      setSuccessMsg(`Departure slot marked ${nextStatus}.`);
+      onSessionsUpdated?.(listing.id, optimisticSessions);
     }
   };
 
   const handleDelete = async (sessionId: string) => {
     setErrorMsg(null);
+    setSuccessMsg(null);
     const res = await deleteExperienceSessionAction(sessionId);
     if (res.error) {
       setErrorMsg(res.error);
     } else {
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      const nextSessions = sessions.filter((s) => s.id !== sessionId);
+      setSessions(nextSessions);
+      setSuccessMsg(res.success || "Departure slot removed.");
+      onSessionsUpdated?.(listing.id, nextSessions);
     }
   };
 
@@ -1342,13 +1369,31 @@ function ManageSessionsModal({
                     </span>
                   </div>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: "999px",
+                        background: sess.status === "active" ? "rgba(34, 197, 94, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                        color: sess.status === "active" ? "#4ade80" : "#94a3b8",
+                        border: sess.status === "active" ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(148, 163, 184, 0.3)",
+                      }}
+                    >
+                      {sess.status === "active" ? "Active" : "Inactive"}
+                    </span>
                     <button
                       type="button"
                       className="pdash-action-btn"
+                      disabled={updatingSessionId === sess.id}
                       style={{ fontSize: "11px", padding: "4px 8px" }}
                       onClick={() => handleToggleStatus(sess)}
                     >
-                      {sess.status === "active" ? "Active" : "Inactive"}
+                      {updatingSessionId === sess.id
+                        ? "Saving…"
+                        : sess.status === "active"
+                        ? "Set Inactive"
+                        : "Set Active"}
                     </button>
                     <button
                       type="button"

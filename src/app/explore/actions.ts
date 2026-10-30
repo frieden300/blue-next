@@ -52,6 +52,11 @@ export async function confirmExperienceBookingAction(
     return { error: "Number of guests must be a valid whole number between 1 and 50." };
   }
 
+  // Validate session ID format if provided
+  if (input.sessionId && !isValidUUID(input.sessionId)) {
+    return { error: "Invalid departure session identifier." };
+  }
+
   const supabase = await createClient();
 
   // Auth guard
@@ -128,25 +133,44 @@ export async function getExperienceSessionsAvailabilityAction(
     }
 
     const rows = (data || []) as Array<{
-      session_id: string;
+      id?: string;
+      session_id?: string;
       departure_time: string;
       label: string | null;
-      max_capacity: number;
+      max_capacity: number | string;
       booked_guests: number | string;
-      available_spots: number | string;
-      is_available: boolean;
+      remaining_spots?: number | string;
+      available_spots?: number | string;
+      is_available?: boolean;
+      status?: string;
     }>;
 
     return {
-      sessions: rows.map((r) => ({
-        sessionId: r.session_id,
-        departureTime: r.departure_time,
-        label: r.label,
-        maxCapacity: Number(r.max_capacity),
-        bookedGuests: Number(r.booked_guests),
-        availableSpots: Number(r.available_spots),
-        isAvailable: Boolean(r.is_available),
-      })),
+      sessions: rows.map((r) => {
+        const id = r.session_id || r.id || "";
+        const maxCap = Number(r.max_capacity) || 0;
+        const booked = Number(r.booked_guests) || 0;
+        const spots =
+          r.available_spots !== undefined
+            ? Number(r.available_spots)
+            : r.remaining_spots !== undefined
+            ? Number(r.remaining_spots)
+            : Math.max(0, maxCap - booked);
+        const isAvail =
+          r.is_available !== undefined
+            ? Boolean(r.is_available)
+            : r.status === "active";
+
+        return {
+          sessionId: id,
+          departureTime: r.departure_time,
+          label: r.label,
+          maxCapacity: maxCap,
+          bookedGuests: booked,
+          availableSpots: isNaN(spots) ? 0 : Math.max(0, spots),
+          isAvailable: isAvail,
+        };
+      }),
     };
   } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : "Failed to load session availability." };

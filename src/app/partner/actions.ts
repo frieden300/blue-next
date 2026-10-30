@@ -2,10 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import type { ExperienceSession } from "@/types/marketplace";
 
 export interface PartnerActionState {
   error?: string | null;
   success?: string | null;
+  session?: ExperienceSession;
 }
 
 // ── Submit or resubmit a partner application ──────────────────
@@ -514,24 +516,37 @@ export async function createExperienceSessionAction(
     return { error: "Invalid departure session details. Time and positive capacity required." };
   }
 
-  const { error } = await supabase.from("experience_sessions").insert({
-    listing_id: listingId,
-    departure_time: departureTime.trim(),
-    max_capacity: maxCapacity,
-    label: label?.trim() || null,
-    status: "active",
-  });
+  const { data, error } = await supabase
+    .from("experience_sessions")
+    .insert({
+      listing_id: listingId,
+      departure_time: departureTime.trim(),
+      max_capacity: maxCapacity,
+      label: label?.trim() || null,
+      status: "active",
+    })
+    .select("id, departure_time, max_capacity, label, status")
+    .single();
 
-  if (error) {
-    if (error.code === "23505") {
+  if (error || !data) {
+    if (error?.code === "23505") {
       return { error: "A departure time slot with this time already exists for this experience." };
     }
-    return { error: `Failed to create departure time: ${error.message}` };
+    return { error: `Failed to create departure time: ${error?.message || "Unknown error"}` };
   }
 
   revalidatePath("/partner/dashboard");
   revalidatePath("/explore");
-  return { success: "Departure time slot added." };
+  return {
+    success: "Departure time slot added.",
+    session: {
+      id: data.id,
+      departure_time: data.departure_time,
+      max_capacity: data.max_capacity,
+      label: data.label,
+      status: (data.status as "active" | "inactive") || "active",
+    },
+  };
 }
 
 export async function updateExperienceSessionAction(

@@ -19,7 +19,7 @@ export interface ExperienceSession {
   departure_time: string;
   max_capacity: number;
   label?: string | null;
-  status: string;
+  status: "active" | "inactive";
 }
 
 export interface Experience {

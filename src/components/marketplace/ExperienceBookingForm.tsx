@@ -50,7 +50,8 @@ export default function ExperienceBookingForm({
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(() => {
     if (!initialSessions || initialSessions.length === 0) return null;
-    return initialSessions[0]?.id ?? null;
+    const firstActive = initialSessions.find((s) => s.status === "active");
+    return firstActive?.id ?? initialSessions[0]?.id ?? null;
   });
 
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -80,11 +81,30 @@ export default function ExperienceBookingForm({
       if (res.sessions && res.sessions.length > 0) {
         setSessions(res.sessions);
         setSelectedSessionId((current) => {
-          if (current && res.sessions?.some((s) => s.sessionId === current && s.isAvailable)) {
+          // Keep current if still valid, active, and fits the selected guests
+          if (
+            current &&
+            res.sessions?.some(
+              (s) => s.sessionId === current && s.isAvailable && s.availableSpots >= guests
+            )
+          ) {
             return current;
           }
-          const firstAvailable = res.sessions?.find((s) => s.isAvailable && s.availableSpots > 0);
-          return firstAvailable ? firstAvailable.sessionId : res.sessions![0].sessionId;
+          // Otherwise auto-select the first slot with enough capacity
+          const firstFitting = res.sessions?.find(
+            (s) => s.isAvailable && s.availableSpots >= guests
+          );
+          if (firstFitting) return firstFitting.sessionId;
+
+          // Or the first slot that has any remaining capacity
+          const firstWithSpots = res.sessions?.find(
+            (s) => s.isAvailable && s.availableSpots > 0
+          );
+          if (firstWithSpots) return firstWithSpots.sessionId;
+
+          // Fallback to first active session, or first session
+          const firstActive = res.sessions?.find((s) => s.isAvailable);
+          return firstActive ? firstActive.sessionId : res.sessions![0].sessionId;
         });
       }
     });
@@ -92,9 +112,15 @@ export default function ExperienceBookingForm({
     return () => {
       cancelled = true;
     };
-  }, [listingId, bookingDate, hasConfiguredSessions]);
+  }, [listingId, bookingDate, guests, hasConfiguredSessions]);
 
   const selectedSession = sessions.find((s) => s.sessionId === selectedSessionId);
+
+  const isSelectedSessionBookable =
+    !hasConfiguredSessions ||
+    (Boolean(selectedSession) &&
+      Boolean(selectedSession?.isAvailable) &&
+      (selectedSession?.availableSpots ?? 0) >= guests);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,8 +137,22 @@ export default function ExperienceBookingForm({
         setServerError("Please select a departure time slot.");
         return;
       }
-      if (selectedSession && selectedSession.availableSpots < guests) {
-        setServerError(`Selected session only has ${selectedSession.availableSpots} spots remaining.`);
+      if (!selectedSession) {
+        setServerError("Selected departure time slot not found. Please choose an available slot.");
+        return;
+      }
+      if (!selectedSession.isAvailable) {
+        setServerError("The selected departure time slot is no longer active. Please choose another slot.");
+        return;
+      }
+      if (selectedSession.availableSpots <= 0) {
+        setServerError("The selected departure time slot is sold out. Please choose another slot.");
+        return;
+      }
+      if (selectedSession.availableSpots < guests) {
+        setServerError(
+          `Selected session only has ${selectedSession.availableSpots} spot(s) remaining for ${guests} guest(s).`
+        );
         return;
       }
     }
@@ -326,7 +366,7 @@ export default function ExperienceBookingForm({
 
                 return (
                   <button
-                    key={s.sessionId}
+                    key={s.sessionId || s.departureTime}
                     type="button"
                     disabled={disabled}
                     onClick={() => {
@@ -404,16 +444,24 @@ export default function ExperienceBookingForm({
         <button
           type="submit"
           className="btn-book-exp"
-          disabled={isPending}
+          disabled={isPending || !isSelectedSessionBookable}
           style={{
             display: "block",
             textAlign: "center",
-            opacity: isPending ? 0.6 : 1,
-            cursor: isPending ? "not-allowed" : "pointer",
+            opacity: isPending || !isSelectedSessionBookable ? 0.6 : 1,
+            cursor: isPending || !isSelectedSessionBookable ? "not-allowed" : "pointer",
           }}
         >
           {isPending
             ? "Booking Experience…"
+            : hasConfiguredSessions && selectedSession && !selectedSession.isAvailable
+            ? "Selected Slot Inactive"
+            : hasConfiguredSessions && selectedSession && selectedSession.availableSpots <= 0
+            ? "Selected Slot Sold Out"
+            : hasConfiguredSessions && selectedSession && selectedSession.availableSpots < guests
+            ? `Only ${selectedSession.availableSpots} Spot(s) Available`
+            : hasConfiguredSessions && !selectedSession
+            ? "Please Select a Departure Slot"
             : `Book This Experience — ${formatINR(totalAmount)}`}
         </button>
 
