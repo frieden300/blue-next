@@ -69,44 +69,25 @@ export default function ChangePasswordCard({ email }: ChangePasswordCardProps) {
           <form action={formAction} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <input type="hidden" name="email" value={email} />
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-              <button
-                type="submit"
-                className="auth-btn-submit"
-                disabled={isPending}
-                style={{
-                  height: "44px",
-                  borderRadius: "12px",
-                  fontSize: "0.88rem",
-                  marginTop: 0,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {isPending ? "Sending Code..." : "Send Recovery Code →"}
-              </button>
-
-              <Link
-                href={`/account/reset-password?email=${encodeURIComponent(email)}`}
-                className="auth-btn-secondary"
-                style={{
-                  height: "44px",
-                  borderRadius: "12px",
-                  fontSize: "0.88rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "6px",
-                  whiteSpace: "nowrap",
-                  textDecoration: "none",
-                }}
-              >
-                Enter Existing Code &rarr;
-              </Link>
-            </div>
+            <button
+              type="submit"
+              className="auth-btn-submit"
+              disabled={isPending}
+              style={{
+                height: "44px",
+                borderRadius: "12px",
+                fontSize: "0.88rem",
+                marginTop: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+                whiteSpace: "nowrap",
+                width: "100%",
+              }}
+            >
+              {isPending ? "Sending Code..." : "Change Password →"}
+            </button>
           </form>
         )}
       </div>
