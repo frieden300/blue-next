@@ -1,9 +1,22 @@
-:root {
+:root,
+.experience {
     color-scheme: dark;
     --white: #f2f7f8;
     --blue: #82d9ed;
     --muted: rgba(232, 244, 248, .68);
-    --ease: cubic-bezier(.2, .7, .2, 1)
+    --ease: cubic-bezier(.2, .7, .2, 1);
+
+    /* ─── VIDEO SHADE & DARKNESS CONTROLS ─────────────────────────────
+       Tune these variables to adjust the video background shade and darkness:
+       • --shade-opacity: Master shade opacity (0 = off/pure raw mp4, 1 = active)
+       • --shade-left-darkness: Darkness level on the far-left edge behind text (0.0 to 1.0)
+       • --shade-spread: How far across the screen the text backdrop extends (e.g. 38%)
+       • --shade-overall-dim: Uniform dimming across the entire video (0.0 = none)
+    ─────────────────────────────────────────────────────────────────── */
+    --shade-opacity: 1;
+    --shade-left-darkness: 0.42;
+    --shade-spread: 38%;
+    --shade-overall-dim: 0.15;
 }
 
 * {
@@ -31,7 +44,11 @@ body {
     inset: 0;
     overflow: hidden;
     isolation: isolate;
-    background: #03111c
+    background: #03111c;
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .video-stage {
@@ -39,41 +56,72 @@ body {
     z-index: -2;
     inset: 0;
     background: #03111c;
-    overflow: hidden
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-.cinema-video {
+.cinema-video,
+#videoA,
+#videoB,
+.video-stage video,
+.cinema-video.is-hidden,
+#videoA.is-hidden,
+#videoB.is-hidden {
     position: absolute;
+    z-index: 0;
     width: 100%;
     height: 100%;
     inset: 0;
     object-fit: cover;
     opacity: 0;
-    transform: scale(1.025);
-    transition: opacity 1s var(--ease)
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+    mix-blend-mode: normal !important;
+    pointer-events: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
 }
 
-.cinema-video.visible {
-    opacity: 1
+.cinema-video.visible,
+.cinema-video.is-active,
+#videoA.visible,
+#videoA.is-active,
+#videoB.visible,
+#videoB.is-active,
+.video-stage video.visible,
+.video-stage video.is-active {
+    z-index: 1;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+    mix-blend-mode: normal !important;
 }
 
 .shade {
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, rgba(1, 10, 18, .58), rgba(1, 10, 18, .12) 80%), linear-gradient(0deg, rgba(1, 10, 18, .62), transparent 38%, rgba(1, 10, 18, .25));
-    pointer-events: none
+    z-index: 2;
+    opacity: var(--shade-opacity, 1);
+    background-color: rgba(1, 10, 18, var(--shade-overall-dim, 0));
+    background-image: linear-gradient(90deg,
+        rgba(1, 10, 18, var(--shade-left-darkness, 0.42)) 0%,
+        transparent var(--shade-spread, 38%));
+    pointer-events: none;
 }
 
 .grain {
-    position: absolute;
-    inset: 0;
-    opacity: .07;
-    pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E")
+    display: none !important;
 }
 
 .glow {
     position: absolute;
+    z-index: 2;
     width: 40vw;
     height: 40vw;
     right: -10%;
@@ -83,15 +131,16 @@ body {
     background: #1786bd;
     opacity: .13;
     animation: drift 18s ease-in-out infinite alternate;
-    pointer-events: none
+    pointer-events: none;
 }
 
 .particles {
     position: absolute;
+    z-index: 3;
     inset: 0;
     opacity: 0;
     transition: opacity 1s;
-    pointer-events: none
+    pointer-events: none;
 }
 
 .particles.on {
@@ -172,7 +221,7 @@ body {
     transform: translate3d(0, -46%, 0);
     opacity: 1;
     filter: blur(0px);
-    transition: 
+    transition:
         opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
         transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
         filter 0.65s cubic-bezier(0.22, 1, 0.36, 1);
@@ -183,7 +232,7 @@ body {
     opacity: 0;
     transform: translate3d(0, calc(-46% - 16px), 0);
     filter: blur(6px);
-    transition: 
+    transition:
         opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
         transform 0.3s cubic-bezier(0.4, 0, 1, 1),
         filter 0.3s cubic-bezier(0.4, 0, 1, 1);
@@ -198,7 +247,8 @@ body {
 
 .copy>p:first-child {
     color: var(--blue);
-    margin: 0 0 22px
+    margin: 0 0 22px;
+    text-shadow: 0 1px 12px rgba(1, 10, 18, 0.7);
 }
 
 .copy h1 {
@@ -206,13 +256,14 @@ body {
     line-height: .98;
     letter-spacing: -.065em;
     font-weight: 500;
-    margin: 0
+    margin: 0;
+    text-shadow: 0 2px 24px rgba(1, 10, 18, 0.7);
 }
 
 .copy h1 em {
     font-family: Georgia, "Times New Roman", serif;
     font-weight: 400;
-    letter-spacing: -.055em
+    letter-spacing: -.055em;
 }
 
 .copy>p:last-child {
@@ -220,7 +271,8 @@ body {
     margin-top: 25px;
     font-size: clamp(12px, 1.1vw, 15px);
     line-height: 1.8;
-    color: var(--muted)
+    color: var(--muted);
+    text-shadow: 0 1px 12px rgba(1, 10, 18, 0.7);
 }
 
 .experience footer,
@@ -326,9 +378,12 @@ body {
 }
 
 @keyframes scrollCueBob {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0);
     }
+
     50% {
         transform: translateY(4px);
     }
@@ -339,14 +394,17 @@ body {
         opacity: 0;
         transform: translateY(0);
     }
+
     20% {
         opacity: 1;
         transform: translateY(0);
     }
+
     68% {
         opacity: 1;
         transform: translateY(6px);
     }
+
     100% {
         opacity: 0;
         transform: translateY(8px);
@@ -354,10 +412,13 @@ body {
 }
 
 @keyframes chevronWave {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: .25;
         transform: translateY(0);
     }
+
     50% {
         opacity: 1;
         transform: translateY(1.5px);
@@ -545,6 +606,7 @@ body {
 }
 
 @media(max-width:700px) {
+
     .experience header,
     .scrolly-header {
         padding: 12px 16px
@@ -632,32 +694,48 @@ body {
 
 @media(prefers-reduced-motion:reduce) {
 
-    *,
-    *:before,
-    *:after {
+    *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *),
+    *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *):before,
+    *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *):after {
         animation-duration: .01ms !important;
         animation-iteration-count: 1 !important;
-        transition-duration: .01ms !important
+        transition-duration: .01ms !important;
     }
 
-    .scroll-prompt,
-    .scroll-prompt-cue,
-    .scroll-mouse,
-    .scroll-wheel,
-    .scroll-chevrons,
-    .scroll-chevrons path {
-        animation: none !important;
-        transform: none !important;
-        transition: none !important;
+    /* Preserve stage text transitions */
+    .copy {
+        transition:
+            opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+            filter 0.65s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    }
+
+    .copy.changing {
+        transition:
+            opacity 0.3s cubic-bezier(0.4, 0, 1, 1),
+            transform 0.3s cubic-bezier(0.4, 0, 1, 1),
+            filter 0.3s cubic-bezier(0.4, 0, 1, 1) !important;
+    }
+
+    /* Preserve mouse scroll indicator animations */
+    .scroll-prompt {
+        transition: opacity .5s cubic-bezier(.2, .7, .2, 1), transform .5s cubic-bezier(.2, .7, .2, 1) !important;
+    }
+
+    .scroll-prompt-cue {
+        animation: scrollCueBob 2.8s ease-in-out infinite !important;
     }
 
     .scroll-wheel {
-        opacity: 1 !important;
-        transform: translateY(2px) !important;
+        animation: mouseWheelGlide 2s cubic-bezier(.2, .7, .2, 1) infinite !important;
     }
 
-    .scroll-chevrons path {
-        opacity: .85 !important;
+    .scroll-chevrons .chevron-1 {
+        animation: chevronWave 2s ease-in-out infinite !important;
+    }
+
+    .scroll-chevrons .chevron-2 {
+        animation: chevronWave 2s ease-in-out .3s infinite !important;
     }
 }
 
@@ -924,15 +1002,19 @@ body {
 }
 
 @keyframes ctaFloatBob {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: translateY(0px);
     }
+
     50% {
         transform: translateY(-9px);
     }
 }
 
 @media(max-width:860px) {
+
     .experience header,
     .scrolly-header {
         gap: 10px

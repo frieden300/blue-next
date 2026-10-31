@@ -79,7 +79,9 @@ button {
 ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *),
+  *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *)::before,
+  *:not(.copy):not(.copy *):not(.scroll-prompt):not(.scroll-prompt *)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

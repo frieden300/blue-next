@@ -147,10 +147,32 @@ export default function Scrollytelling() {
   return (
     <>
       <div className="scroll-space" aria-hidden="true" />
-      <main className="experience">
+      <main className="experience" onContextMenu={(e) => e.preventDefault()}>
         <div className="video-stage">
-          <video id="videoA" className="cinema-video visible" muted playsInline preload="auto" />
-          <video id="videoB" className="cinema-video" muted playsInline preload="metadata" />
+          <video
+            id="videoA"
+            className="cinema-video visible is-active"
+            muted
+            playsInline
+            preload="auto"
+            controlsList="nodownload nofullscreen noremoteplayback"
+            disablePictureInPicture
+            disableRemotePlayback
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+          <video
+            id="videoB"
+            className="cinema-video"
+            muted
+            playsInline
+            preload="auto"
+            controlsList="nodownload nofullscreen noremoteplayback"
+            disablePictureInPicture
+            disableRemotePlayback
+            tabIndex={-1}
+            aria-hidden="true"
+          />
           <div className="shade" />
           <div className="grain" />
           <div className="glow" />
@@ -243,7 +265,7 @@ export default function Scrollytelling() {
         <div className="side-note">AMBIENT SOUND · TOGGLE ANYTIME</div>
       </main>
       <Script
-        src="/assets/scrollytelling.js?v=20261030b"
+        src="/assets/scrollytelling.js?v=20261031a"
         strategy="afterInteractive"
         onLoad={() => {
           if (typeof (window as unknown as { __blueScrollyInit?: () => void }).__blueScrollyInit === "function") {

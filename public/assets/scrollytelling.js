@@ -386,7 +386,7 @@
         experience = document.querySelector(".experience");
     }
 
-    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduced = false;
     let activeVideo = 0;
     let activeSegment = 0;
     let target = 0;
@@ -421,13 +421,26 @@
 
     const INPUT_DISTANCE_PER_VIEWPORT = 1.0;
     const WHEEL_SENSITIVITY = 0.015;
-    const TOUCH_SENSITIVITY = 0.6;
     const TOUCH_HOLD_DELAY_MS = 380;
     const TOUCH_MOVE_CANCEL_DIST = 10;
 
+    /**
+     * Mobile passage video touch swipe sensitivity:
+     * Vertical touch displacement (in pixels) required to traverse a full passage video.
+     * • Lower value = higher sensitivity (less finger movement required).
+     * • Higher value = lower sensitivity (more finger movement required).
+     *
+     * Initialized with the existing effective value: Math.max(380, window.innerHeight * 0.7).
+     * Can also be set to a fixed pixel distance (e.g., 380, 450, 550).
+     */
+    const MOBILE_PASSAGE_SWIPE_PX = Math.max(977, window.innerHeight * 1, 8);
+
     let touchStartX = 0;
     let touchStartY = 0;
+    let touchStartTarget = 0;
     let touchIsScrolling = false;
+    let isMobileTouchActive = false;
+    let pendingMobileSeekTime = null;
 
     const totalWeight = segments.reduce((sum, segment) => sum + segment.weight, 0);
     const starts = [];
@@ -445,6 +458,22 @@
         try {
             video.currentTime = targetTime;
         } catch { }
+    }
+
+    function seekMobilePassage(video, targetTime) {
+        if (!video || !Number.isFinite(targetTime)) return;
+        if (Math.abs(video.currentTime - targetTime) < 0.015) {
+            pendingMobileSeekTime = null;
+            return;
+        }
+        if (!video.seeking) {
+            pendingMobileSeekTime = null;
+            try {
+                video.currentTime = targetTime;
+            } catch { }
+        } else {
+            pendingMobileSeekTime = targetTime;
+        }
     }
 
     function segmentAt(progress) {
@@ -543,9 +572,121 @@
         restartLoop(video, segment);
     }
 
+    let activatingSegment = -1;
+
+    function ensureVideoFrameReady(video, onReady) {
+        if (!video) return;
+
+        let called = false;
+        const done = () => {
+            if (called) return;
+            called = true;
+            cleanup();
+            onReady();
+        };
+
+        const cleanup = () => {
+            video.removeEventListener("loadeddata", onFrameCheck);
+            video.removeEventListener("canplay", onFrameCheck);
+            video.removeEventListener("seeked", onFrameCheck);
+            video.removeEventListener("playing", onFrameCheck);
+        };
+
+        const onFrameCheck = () => {
+            if (video.readyState >= 2 && !video.seeking) {
+                if (typeof video.requestVideoFrameCallback === "function") {
+                    try {
+                        video.requestVideoFrameCallback(() => done());
+                        setTimeout(done, 50);
+                        return;
+                    } catch { }
+                }
+                done();
+            }
+        };
+
+        if (video.readyState >= 2 && !video.seeking) {
+            if (typeof video.requestVideoFrameCallback === "function") {
+                try {
+                    video.requestVideoFrameCallback(() => done());
+                    setTimeout(done, 50);
+                    return;
+                } catch { }
+            }
+            done();
+            return;
+        }
+
+        video.addEventListener("loadeddata", onFrameCheck);
+        video.addEventListener("canplay", onFrameCheck);
+        video.addEventListener("seeked", onFrameCheck);
+        video.addEventListener("playing", onFrameCheck);
+
+        setTimeout(done, 600);
+    }
+
+    function preloadSegment(index, enteringBackward = false) {
+        if (destroyed || !isActive) return;
+        if (index < 0 || index >= segments.length) return;
+        if (index === activeSegment || index === activatingSegment) return;
+
+        const inactiveIndex = 1 - activeVideo;
+        const inactiveVideo = videos[inactiveIndex];
+        if (!inactiveVideo) return;
+
+        const segment = segments[index];
+        const source = `/assets/master/${segment.file}`;
+
+        if ((inactiveVideo.getAttribute("src") || "").endsWith(source)) {
+            if (segment.type === "passage") {
+                try {
+                    if (enteringBackward && Number.isFinite(inactiveVideo.duration) && inactiveVideo.duration > 0) {
+                        const finalFrameTime = Math.max(0, Math.floor(inactiveVideo.duration * 24 - 1) / 24);
+                        if (Math.abs(inactiveVideo.currentTime - finalFrameTime) > 0.05) {
+                            inactiveVideo.currentTime = finalFrameTime;
+                        }
+                    } else if (inactiveVideo.currentTime > 0.05) {
+                        inactiveVideo.currentTime = 0;
+                    }
+                } catch { }
+            }
+            return;
+        }
+
+        inactiveVideo.pause();
+        inactiveVideo.loop = false;
+        inactiveVideo.preload = "auto";
+        inactiveVideo.removeAttribute("src");
+        inactiveVideo.load();
+        inactiveVideo.src = source;
+        inactiveVideo.load();
+
+        const cueInitialFrame = () => {
+            if (destroyed || !isActive) return;
+            if (segment.type === "passage") {
+                try {
+                    if (enteringBackward && Number.isFinite(inactiveVideo.duration) && inactiveVideo.duration > 0) {
+                        const finalFrameTime = Math.max(0, Math.floor(inactiveVideo.duration * 24 - 1) / 24);
+                        inactiveVideo.currentTime = finalFrameTime;
+                    } else {
+                        inactiveVideo.currentTime = 0;
+                    }
+                } catch { }
+            }
+        };
+
+        if (inactiveVideo.readyState >= 1) {
+            cueInitialFrame();
+        } else {
+            inactiveVideo.addEventListener("loadedmetadata", cueInitialFrame, { once: true });
+        }
+    }
+
     function activateSegment(index) {
         if (destroyed || !isActive) return;
-        if (index === activeSegment) return;
+        if (index === activeSegment && activatingSegment === -1) return;
+        if (index === activatingSegment) return;
+        activatingSegment = index;
         const enteringBackward = index < activeSegment;
         const segment = segments[index];
         const token = ++loadToken;
@@ -553,7 +694,6 @@
         const nextVideo = videos[nextIndex];
         const oldVideo = videos[activeVideo];
         const source = `/assets/master/${segment.file}`;
-        activeSegment = index;
         allowLoopTransition = false;
         pendingLoopNext = null;
 
@@ -564,8 +704,16 @@
         }
         updateCopy(index);
 
-        const showVideo = () => {
+        const queueNextPreload = () => {
+            const nextAnticipated = enteringBackward ? index - 1 : index + 1;
+            if (nextAnticipated >= 0 && nextAnticipated < segments.length) {
+                preloadSegment(nextAnticipated, enteringBackward);
+            }
+        };
+
+        const performTransition = () => {
             if (token !== loadToken || destroyed || !isActive) return;
+
             nextVideo.onended = null;
             nextVideo.loop = false;
             if (holdMode) {
@@ -578,8 +726,10 @@
                 try {
                     if (enteringBackward && Number.isFinite(nextVideo.duration) && nextVideo.duration > 0) {
                         const finalFrameTime = Math.max(0, Math.floor(nextVideo.duration * 24 - 1) / 24);
-                        nextVideo.currentTime = finalFrameTime;
-                    } else {
+                        if (Math.abs(nextVideo.currentTime - finalFrameTime) > 0.05) {
+                            nextVideo.currentTime = finalFrameTime;
+                        }
+                    } else if (nextVideo.currentTime > 0.05) {
                         nextVideo.currentTime = 0;
                     }
                 } catch { }
@@ -591,38 +741,52 @@
                 nextVideo.onended = () => handleLoopEnded(nextVideo, segment);
                 nextVideo.play().catch(() => { });
             }
-            nextVideo.classList.add("visible");
-            oldVideo.classList.remove("visible");
-            activeVideo = nextIndex;
-            audioMgr.onSegment(segment.file, nextVideo);
 
-            if (videoFadeTimeout) {
-                clearTimeout(videoFadeTimeout);
-                videoFadeTimeout = null;
-            }
-            videoFadeTimeout = window.setTimeout(() => {
-                videoFadeTimeout = null;
-                if (!destroyed && isActive && oldVideo && oldVideo !== videos[activeVideo]) {
+            ensureVideoFrameReady(nextVideo, () => {
+                if (token !== loadToken || destroyed || !isActive) return;
+
+                nextVideo.classList.add("visible", "is-active");
+                if (oldVideo && oldVideo !== nextVideo) {
+                    oldVideo.classList.remove("visible", "is-active");
                     oldVideo.pause();
                 }
-            }, reduced ? 0 : 1050);
+                activeVideo = nextIndex;
+                activeSegment = index;
+                activatingSegment = -1;
+                audioMgr.onSegment(segment.file, nextVideo);
 
-            if (loading) loading.classList.add("done");
+                if (videoFadeTimeout) {
+                    clearTimeout(videoFadeTimeout);
+                    videoFadeTimeout = null;
+                }
+
+                if (loading) loading.classList.add("done");
+
+                queueNextPreload();
+            });
         };
 
-        nextVideo.pause();
-        nextVideo.onloadedmetadata = null;
-        if (!(nextVideo.getAttribute("src") || "").endsWith(source)) {
+        if ((nextVideo.getAttribute("src") || "").endsWith(source)) {
+            performTransition();
+        } else {
+            nextVideo.pause();
+            nextVideo.preload = "auto";
             nextVideo.removeAttribute("src");
             nextVideo.load();
             nextVideo.src = source;
             nextVideo.load();
-        }
-        if (nextVideo.readyState >= 1 && (nextVideo.getAttribute("src") || "").endsWith(source)) {
-            showVideo();
-        } else {
-            nextVideo.onloadedmetadata = showVideo;
-            nextVideo.load();
+
+            if (nextVideo.readyState >= 2) {
+                performTransition();
+            } else {
+                const onLoaded = () => {
+                    nextVideo.removeEventListener("loadeddata", onLoaded);
+                    nextVideo.removeEventListener("canplay", onLoaded);
+                    performTransition();
+                };
+                nextVideo.addEventListener("loadeddata", onLoaded, { once: true });
+                nextVideo.addEventListener("canplay", onLoaded, { once: true });
+            }
         }
     }
 
@@ -730,6 +894,7 @@
     function handleWheel(event) {
         if (destroyed || !isActive) return;
         event.preventDefault();
+        isMobileTouchActive = false;
         let delta = event.deltaY;
         if (event.deltaMode === 1) delta *= 16;
         if (event.deltaMode === 2) delta *= window.innerHeight;
@@ -762,11 +927,13 @@
         touchY = touch.clientY;
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
+        touchStartTarget = target;
         touchIsScrolling = false;
+        isMobileTouchActive = true;
 
         cancelTouchHoldTimer();
 
-        if (event.target && event.target.closest && event.target.closest(".journey-nav")) return;
+        if (event.target && event.target.closest && event.target.closest(".journey-nav, .site-menu, .journey-cta, .logo")) return;
 
         touchHoldTimeout = setTimeout(() => {
             touchHoldTimeout = null;
@@ -792,24 +959,68 @@
         }
 
         event.preventDefault();
-        const y = touch.clientY;
-        const deltaY = touchY - y;
+        isMobileTouchActive = true;
+        lastInputAt = performance.now();
+
         const currentSeg = segments[activeSegment];
-        if (currentSeg && currentSeg.type === "loop") {
+        if (!currentSeg) return;
+
+        if (currentSeg.type === "passage") {
+            const totalDisplacementY = touchStartY - touch.clientY;
+            const segSpan = currentSeg.weight / totalWeight;
+            const progressDelta = (totalDisplacementY / MOBILE_PASSAGE_SWIPE_PX) * segSpan;
+
+            const minBound = (activeSegment > 0) ? (starts[activeSegment] - 0.0001) : 0;
+            const maxBound = (activeSegment + 1 < segments.length) ? (starts[activeSegment + 1] + 0.00001) : 0.99999;
+
+            target = clamp(touchStartTarget + progressDelta, minBound, maxBound);
+            smooth = target;
+
+            const desired = segmentAt(smooth);
+            if (desired.index !== activeSegment && desired.index !== activatingSegment) {
+                activateSegment(desired.index);
+                touchStartY = touch.clientY;
+                touchStartTarget = target;
+            } else if (activatingSegment === -1) {
+                updateCopy(activeSegment);
+                const video = videos[activeVideo];
+                if (video && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
+                    const time = clamp(desired.local * Math.max(0, video.duration - 0.035), 0, video.duration);
+                    seekMobilePassage(video, time);
+                    if (!video.paused) video.pause();
+                }
+            }
+        } else if (currentSeg.type === "loop") {
+            const deltaY = touchY - touch.clientY;
             const isStage0 = currentSeg.stage === 0;
             if (deltaY > 0) {
                 const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
                 const impulse = (Math.abs(deltaY) / 30) * (multiplier * 0.45);
                 loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
-                lastInputAt = performance.now();
                 audioMgr.duck();
                 audioMgr.scheduledUnduck();
+
+                if (loopExitWindowOpen() && activeSegment + 1 < segments.length) {
+                    pendingLoopNext = activeSegment + 1;
+                    target = starts[pendingLoopNext] + 0.00001;
+                    smooth = target;
+                    allowLoopTransition = true;
+                    activateSegment(pendingLoopNext);
+                    touchStartY = touch.clientY;
+                    touchStartTarget = target;
+                }
             } else if (deltaY < 0) {
                 loopScrollBoost = 0;
+                if (activeSegment > 0 && segments[activeSegment - 1].type === "passage") {
+                    target = starts[activeSegment] - 0.00001;
+                    smooth = target;
+                    activateSegment(activeSegment - 1);
+                    touchStartY = touch.clientY;
+                    touchStartTarget = target;
+                }
             }
         }
-        advanceVirtualScroll(deltaY * TOUCH_SENSITIVITY);
-        touchY = y;
+        touchY = touch.clientY;
     }
 
     function handleTouchEnd() {
@@ -817,8 +1028,21 @@
         if (holdMode) {
             endHoldMode();
         }
-        touchY = null;
+        isMobileTouchActive = false;
         touchIsScrolling = false;
+        touchY = null;
+        smooth = target;
+
+        const currentSeg = segments[activeSegment];
+        const video = videos[activeVideo];
+        if (currentSeg && currentSeg.type === "passage" && video) {
+            if (!video.paused) video.pause();
+            if (Number.isFinite(video.duration) && video.duration > 0) {
+                const desired = segmentAt(smooth);
+                const time = clamp(desired.local * Math.max(0, video.duration - 0.035), 0, video.duration);
+                seekMobilePassage(video, time);
+            }
+        }
     }
 
     function handleTouchCancel() {
@@ -885,9 +1109,13 @@
         if (destroyed || !isActive) return;
 
         const isPassage = segments[activeSegment] && segments[activeSegment].type === "passage";
-        const smoothRate = isPassage ? 0.28 : 0.085;
-        smooth += (target - smooth) * (reduced ? 1 : smoothRate);
-        if (Math.abs(target - smooth) < 0.00002) smooth = target;
+        if (isMobileTouchActive) {
+            smooth = target;
+        } else {
+            const smoothRate = isPassage ? 0.28 : 0.085;
+            smooth += (target - smooth) * (reduced ? 1 : smoothRate);
+            if (Math.abs(target - smooth) < 0.00002) smooth = target;
+        }
         const desired = segmentAt(smooth);
         let chosen = desired;
 
@@ -932,29 +1160,39 @@
         }
 
         if (activeSegment >= 0 && desired.index < activeSegment) chosen = desired;
-        if (chosen.index !== activeSegment) {
+        if (chosen.index !== activeSegment && chosen.index !== activatingSegment) {
             activateSegment(chosen.index);
         }
-        const segment = segments[chosen.index];
+        const segment = segments[activeSegment];
         const video = videos[activeVideo];
-        if (video) {
+        if (video && segment && activatingSegment === -1) {
             if (holdMode) {
                 video.loop = false;
                 video.playbackRate = HOLD_PLAYBACK_RATE;
                 if (video.paused && !video.ended && video.readyState >= 2) video.play().catch(() => { });
             } else if (segment.type === "passage" && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
                 const time = clamp(chosen.local * Math.max(0, video.duration - 0.035), 0, video.duration);
-                const frameDuration = 1 / 24;
-                const targetFrame = Math.round(time / frameDuration);
-                const displayedFrame = Math.round(video.currentTime / frameDuration);
-                if (!video.seeking && displayedFrame !== targetFrame) {
-                    const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
-                    const nextTargetTime = nextFrame * frameDuration;
-                    if (Math.abs(video.currentTime - nextTargetTime) >= 0.015) {
-                        applyPassageSeek(video, nextTargetTime);
+                if (isMobileTouchActive) {
+                    seekMobilePassage(video, time);
+                } else {
+                    const frameDuration = 1 / 24;
+                    const targetFrame = Math.round(time / frameDuration);
+                    const displayedFrame = Math.round(video.currentTime / frameDuration);
+                    if (!video.seeking && displayedFrame !== targetFrame) {
+                        const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
+                        const nextTargetTime = nextFrame * frameDuration;
+                        if (Math.abs(video.currentTime - nextTargetTime) >= 0.015) {
+                            applyPassageSeek(video, nextTargetTime);
+                        }
                     }
                 }
                 if (!video.paused) video.pause();
+
+                if (chosen.local > 0.65 && activeSegment + 1 < segments.length) {
+                    preloadSegment(activeSegment + 1, false);
+                } else if (chosen.local < 0.35 && activeSegment > 0) {
+                    preloadSegment(activeSegment - 1, true);
+                }
             } else if (segment.type === "loop") {
                 if (chosen.index === desired.index && desired.index === activeSegment && !allowLoopTransition) {
                     video.loop = true;
@@ -1031,6 +1269,9 @@
         holdMode = false;
         touchY = null;
         touchIsScrolling = false;
+        isMobileTouchActive = false;
+        pendingMobileSeekTime = null;
+        activatingSegment = -1;
     }
 
     function boot() {
@@ -1055,6 +1296,7 @@
         // Reset runtime values
         activeVideo = 0;
         activeSegment = 0;
+        activatingSegment = -1;
         target = 0;
         smooth = 0;
         lastInputAt = -Infinity;
@@ -1066,12 +1308,32 @@
         loopScrollBoost = 0;
         lastPromptOpacity = "";
 
-        // Register video seeked listeners
+        // Register video seeked listeners for responsive mobile frame updates
         videos.forEach(v => {
             if (!v) return;
             eventManager.add(v, "seeked", () => {
                 if (destroyed || !isActive) return;
+                if (pendingMobileSeekTime !== null) {
+                    const nextTime = pendingMobileSeekTime;
+                    pendingMobileSeekTime = null;
+                    if (Math.abs(v.currentTime - nextTime) >= 0.015) {
+                        try {
+                            v.currentTime = nextTime;
+                        } catch { }
+                    }
+                }
             });
+        });
+
+        // Suppress browser context menu on mobile long-press and desktop right-click
+        const preventContextMenu = (e) => {
+            e.preventDefault();
+            return false;
+        };
+        eventManager.add(window, "contextmenu", preventContextMenu);
+        if (experience) eventManager.add(experience, "contextmenu", preventContextMenu);
+        videos.forEach(v => {
+            if (v) eventManager.add(v, "contextmenu", preventContextMenu);
         });
 
         // Pointer down on experience
@@ -1150,7 +1412,7 @@
         const first = videos[0];
         const second = videos[1];
         if (second) {
-            second.classList.remove("visible");
+            second.classList.remove("visible", "is-active");
             second.pause();
             second.removeAttribute("src");
             second.load();
@@ -1163,9 +1425,11 @@
         first.onended = () => handleLoopEnded(first, segments[0]);
         first.load();
         first.play().catch(() => { });
-        first.classList.add("visible");
+        first.classList.add("visible", "is-active");
 
         if (loading) loading.classList.add("done");
+
+        preloadSegment(1, false);
 
         if (renderRafId) cancelAnimationFrame(renderRafId);
         renderRafId = requestAnimationFrame(render);
