@@ -395,6 +395,7 @@
     const PROMPT_IDLE_FADE_MS = 600;
     let allowLoopTransition = false;
     let pendingLoopNext = null;
+    let directNavTarget = null;
     let loadToken = 0;
     let touchY = null;
     let holdMode = false;
@@ -433,7 +434,7 @@
      * Set directly to a fixed pixel distance (e.g., 450, 543, 977)
      * or a viewport formula (e.g., Math.round(window.innerHeight * 1.2)).
      */
-    const MOBILE_PASSAGE_SWIPE_PX = Math.round(window.innerHeight * 1.4);
+    const MOBILE_PASSAGE_SWIPE_PX = Math.round(window.innerHeight * 1.6);
 
     let touchStartX = 0;
     let touchStartY = 0;
@@ -730,6 +731,13 @@
             ensureVideoFrameReady(nextVideo, () => {
                 if (token !== loadToken || destroyed || !isActive) return;
 
+                if (directNavTarget === null && segmentAt(smooth).index === activeSegment) {
+                    activatingSegment = -1;
+                    pendingLoopNext = null;
+                    allowLoopTransition = false;
+                    return;
+                }
+
                 nextVideo.classList.add("visible", "is-active");
                 if (oldVideo && oldVideo !== nextVideo) {
                     oldVideo.classList.remove("visible", "is-active");
@@ -738,6 +746,11 @@
                 activeVideo = nextIndex;
                 activeSegment = index;
                 activatingSegment = -1;
+                if (directNavTarget === index) {
+                    directNavTarget = null;
+                }
+                pendingLoopNext = null;
+                allowLoopTransition = false;
                 audioMgr.onSegment(segment.file, nextVideo);
 
                 if (videoFadeTimeout) {
@@ -859,7 +872,7 @@
         if (destroyed || !isActive) return false;
         lastInputType = "wheel";
         const seg = segments[activeSegment];
-        if (deltaPixels > 0 && seg && seg.type === "loop" && !holdMode && pendingLoopNext === null) {
+        if (deltaPixels > 0 && seg && seg.type === "loop" && !holdMode && pendingLoopNext === null && activatingSegment === -1 && directNavTarget === null) {
             lastInputAt = performance.now();
             if (activeSegment + 1 >= segments.length || !loopExitWindowOpen()) return false;
             pendingLoopNext = activeSegment + 1;
@@ -873,6 +886,15 @@
         target = clamp(target + delta, 0, 0.99999);
         if (pendingLoopNext !== null && delta > 0) {
             target = Math.min(target, starts[pendingLoopNext] + 0.00001);
+        }
+        if (activatingSegment !== -1) {
+            const actIdx = activatingSegment;
+            if (actIdx < activeSegment) {
+                target = Math.max(target, starts[actIdx] + 0.00001);
+            } else if (actIdx > activeSegment) {
+                const actEnd = (actIdx + 1 < segments.length) ? (starts[actIdx + 1] + 0.00001) : 0.99999;
+                target = Math.min(target, actEnd);
+            }
         }
         return true;
     }
@@ -898,10 +920,12 @@
             } else if (delta < 0) {
                 loopScrollBoost = 0;
             }
-            const loopMultiplier = isStage0
-                ? (delta > 0 ? 0.7 : 0.4)
-                : (delta > 0 ? 0.35 : 0.2);
-            advanceVirtualScroll(delta * loopMultiplier);
+            if (delta > 0) {
+                const loopMultiplier = isStage0 ? 0.7 : 0.35;
+                advanceVirtualScroll(delta * loopMultiplier);
+            } else if (delta < 0) {
+                advanceVirtualScroll(delta * WHEEL_SENSITIVITY);
+            }
         } else {
             advanceVirtualScroll(delta * WHEEL_SENSITIVITY);
         }
@@ -1086,6 +1110,11 @@
         target = starts[firstSegment] + 0.00001;
         smooth = target;
         lastInputAt = performance.now();
+        if (firstSegment === activeSegment && activatingSegment === -1) {
+            directNavTarget = null;
+            return;
+        }
+        directNavTarget = firstSegment;
         activateSegment(firstSegment);
     }
 
@@ -1119,7 +1148,7 @@
             loopScrollBoost = 0;
         }
 
-        if (activeSegment >= 0 && segments[activeSegment].type === "loop" && desired.index > activeSegment && !allowLoopTransition) {
+        if (directNavTarget === null && activatingSegment === -1 && activeSegment >= 0 && segments[activeSegment].type === "loop" && desired.index > activeSegment && !allowLoopTransition) {
             const nextIdx = activeSegment + 1;
             pendingLoopNext = nextIdx;
             target = Math.min(target, starts[nextIdx] + 0.00001);
@@ -1276,6 +1305,8 @@
         isMobileTouchActive = false;
         lastInputType = "wheel";
         activatingSegment = -1;
+        directNavTarget = null;
+        pendingLoopNext = null;
     }
 
     function boot() {
@@ -1306,6 +1337,7 @@
         lastInputAt = -Infinity;
         allowLoopTransition = false;
         pendingLoopNext = null;
+        directNavTarget = null;
         loadToken = 0;
         touchY = null;
         holdMode = false;

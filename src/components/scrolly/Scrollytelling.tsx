@@ -265,7 +265,7 @@ export default function Scrollytelling() {
         <div className="side-note">AMBIENT SOUND · TOGGLE ANYTIME</div>
       </main>
       <Script
-        src="/assets/scrollytelling.js?v=20261031a"
+        src="/assets/scrollytelling.js?v=20261031c"
         strategy="afterInteractive"
         onLoad={() => {
           if (typeof (window as unknown as { __blueScrollyInit?: () => void }).__blueScrollyInit === "function") {

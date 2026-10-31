@@ -14,9 +14,9 @@
        • --shade-overall-dim: Uniform dimming across the entire video (0.0 = none)
     ─────────────────────────────────────────────────────────────────── */
     --shade-opacity: 1;
-    --shade-left-darkness: 0.42;
-    --shade-spread: 38%;
-    --shade-overall-dim: 0.15;
+    --shade-left-darkness: 0.75;
+    --shade-spread: 52%;
+    --shade-overall-dim: 0.38;
 }
 
 * {
@@ -108,10 +108,17 @@ body {
     inset: 0;
     z-index: 2;
     opacity: var(--shade-opacity, 1);
-    background-color: rgba(1, 10, 18, var(--shade-overall-dim, 0));
-    background-image: linear-gradient(90deg,
-        rgba(1, 10, 18, var(--shade-left-darkness, 0.42)) 0%,
-        transparent var(--shade-spread, 38%));
+    background-color: rgba(1, 10, 18, var(--shade-overall-dim, 0.28));
+    background-image:
+        linear-gradient(90deg,
+            rgba(1, 10, 18, var(--shade-left-darkness, 0.65)) 0%,
+            rgba(1, 10, 18, 0.22) calc(var(--shade-spread, 52%) * 0.65),
+            transparent var(--shade-spread, 52%)),
+        linear-gradient(0deg,
+            rgba(1, 10, 18, 0.45) 0%,
+            transparent 28%,
+            transparent 75%,
+            rgba(1, 10, 18, 0.25) 100%);
     pointer-events: none;
 }
 
@@ -176,7 +183,8 @@ body {
     font-weight: 800;
     letter-spacing: .2em;
     color: var(--white);
-    text-decoration: none
+    text-decoration: none;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 2px 10px rgba(0, 0, 0, 0.85);
 }
 
 .logo span,
@@ -196,20 +204,23 @@ body {
 }
 
 .topnote {
-    color: #f2f7f88c
+    color: #f2f7f88c;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.85);
 }
 
 .edition {
     display: flex;
     align-items: center;
     gap: 12px;
-    color: #f2f7f8bf
+    color: #f2f7f8bf;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.85);
 }
 
 .edition i {
     width: 32px;
     height: 1px;
-    background: #ffffff80
+    background: #ffffff80;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 6px rgba(1, 10, 18, 0.8);
 }
 
 .copy {
@@ -248,7 +259,11 @@ body {
 .copy>p:first-child {
     color: var(--blue);
     margin: 0 0 22px;
-    text-shadow: 0 1px 12px rgba(1, 10, 18, 0.7);
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 1),
+        0 2px 6px rgba(0, 0, 0, 0.95),
+        0 3px 12px rgba(1, 10, 18, 0.9),
+        0 0 16px rgba(1, 10, 18, 0.85);
 }
 
 .copy h1 {
@@ -257,7 +272,7 @@ body {
     letter-spacing: -.065em;
     font-weight: 500;
     margin: 0;
-    text-shadow: 0 2px 24px rgba(1, 10, 18, 0.7);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9), 0 4px 16px rgba(0, 0, 0, 0.8), 0 8px 32px rgba(1, 10, 18, 0.75);
 }
 
 .copy h1 em {
@@ -272,7 +287,11 @@ body {
     font-size: clamp(12px, 1.1vw, 15px);
     line-height: 1.8;
     color: var(--muted);
-    text-shadow: 0 1px 12px rgba(1, 10, 18, 0.7);
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 1),
+        0 2px 6px rgba(0, 0, 0, 0.95),
+        0 3px 14px rgba(1, 10, 18, 0.9),
+        0 0 18px rgba(1, 10, 18, 0.85);
 }
 
 .experience footer,
@@ -429,7 +448,8 @@ body {
     display: flex;
     gap: 12px;
     align-items: center;
-    letter-spacing: .16em
+    letter-spacing: .16em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9), 0 3px 14px rgba(1, 10, 18, 0.85);
 }
 
 .caption span:first-child {
@@ -442,7 +462,8 @@ body {
 
 .count {
     font-size: 12px;
-    letter-spacing: .08em
+    letter-spacing: .08em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9), 0 3px 14px rgba(1, 10, 18, 0.85);
 }
 
 .count strong {
@@ -469,7 +490,8 @@ body {
     top: 7px;
     bottom: 7px;
     width: 1px;
-    background: #ffffff33
+    background: #ffffff33;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 0 0 8px rgba(1, 10, 18, 0.8);
 }
 
 .journey-nav button {
@@ -493,6 +515,7 @@ body {
     border-radius: 50%;
     background: #edf8fc80;
     border: 1px solid #ffffff4d;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.95), 0 0 6px rgba(1, 10, 18, 0.8);
     transition: all .3s
 }
 
@@ -504,7 +527,12 @@ body {
     letter-spacing: .1em;
     opacity: 0;
     transform: translateX(4px);
-    transition: all .25s
+    transition: all .25s;
+    text-shadow:
+        0 1px 2px rgba(0, 0, 0, 1),
+        0 2px 6px rgba(0, 0, 0, 0.95),
+        0 3px 12px rgba(1, 10, 18, 0.9),
+        0 0 16px rgba(1, 10, 18, 0.85);
 }
 
 .journey-nav button.active:before {
@@ -512,7 +540,7 @@ body {
     height: 10px;
     background: var(--blue);
     border: 0;
-    box-shadow: 0 0 0 5px #82d9ed1f, 0 0 18px #82d9edb3
+    box-shadow: 0 0 0 5px #82d9ed1f, 0 0 18px #82d9edb3, 0 1px 4px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(1, 10, 18, 0.85);
 }
 
 .journey-nav button.active span,
@@ -534,8 +562,9 @@ body {
     top: 50%;
     writing-mode: vertical-rl;
     transform: rotate(180deg) translateX(50%);
-    color: #f2f7f861;
-    font-size: 8px
+    color: #f2f7f88c;
+    font-size: 8px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9), 0 0 12px rgba(1, 10, 18, 0.85);
 }
 
 .loading {
@@ -606,6 +635,21 @@ body {
 }
 
 @media(max-width:700px) {
+
+    :root,
+    .experience {
+        --shade-opacity: 1;
+        --shade-left-darkness: 0.42;
+        --shade-spread: 38%;
+        --shade-overall-dim: 0.15;
+    }
+
+    .shade {
+        background-color: rgba(1, 10, 18, var(--shade-overall-dim, 0.15));
+        background-image: linear-gradient(90deg,
+                rgba(1, 10, 18, var(--shade-left-darkness, 0.42)) 0%,
+                transparent var(--shade-spread, 38%));
+    }
 
     .experience header,
     .scrolly-header {
