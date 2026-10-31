@@ -427,20 +427,20 @@
     /**
      * Mobile passage video touch swipe sensitivity:
      * Vertical touch displacement (in pixels) required to traverse a full passage video.
-     * • Lower value = higher sensitivity (less finger movement required).
-     * • Higher value = lower sensitivity (more finger movement required).
+     * • Lower value = higher sensitivity (less finger movement required, faster passage progression).
+     * • Higher value = lower sensitivity (more finger movement required, slower passage progression).
      *
-     * Initialized with the existing effective value: Math.max(380, window.innerHeight * 0.7).
-     * Can also be set to a fixed pixel distance (e.g., 380, 450, 550).
+     * Set directly to a fixed pixel distance (e.g., 450, 543, 977)
+     * or a viewport formula (e.g., Math.round(window.innerHeight * 1.2)).
      */
-    const MOBILE_PASSAGE_SWIPE_PX = Math.max(977, window.innerHeight * 1, 8);
+    const MOBILE_PASSAGE_SWIPE_PX = Math.round(window.innerHeight * 1.4);
 
     let touchStartX = 0;
     let touchStartY = 0;
     let touchStartTarget = 0;
     let touchIsScrolling = false;
     let isMobileTouchActive = false;
-    let pendingMobileSeekTime = null;
+    let lastInputType = "wheel";
 
     const totalWeight = segments.reduce((sum, segment) => sum + segment.weight, 0);
     const starts = [];
@@ -460,21 +460,6 @@
         } catch { }
     }
 
-    function seekMobilePassage(video, targetTime) {
-        if (!video || !Number.isFinite(targetTime)) return;
-        if (Math.abs(video.currentTime - targetTime) < 0.015) {
-            pendingMobileSeekTime = null;
-            return;
-        }
-        if (!video.seeking) {
-            pendingMobileSeekTime = null;
-            try {
-                video.currentTime = targetTime;
-            } catch { }
-        } else {
-            pendingMobileSeekTime = targetTime;
-        }
-    }
 
     function segmentAt(progress) {
         const position = clamp(progress, 0, 0.999999) * totalWeight;
@@ -872,6 +857,7 @@
 
     function advanceVirtualScroll(deltaPixels) {
         if (destroyed || !isActive) return false;
+        lastInputType = "wheel";
         const seg = segments[activeSegment];
         if (deltaPixels > 0 && seg && seg.type === "loop" && !holdMode && pendingLoopNext === null) {
             lastInputAt = performance.now();
@@ -894,6 +880,7 @@
     function handleWheel(event) {
         if (destroyed || !isActive) return;
         event.preventDefault();
+        lastInputType = "wheel";
         isMobileTouchActive = false;
         let delta = event.deltaY;
         if (event.deltaMode === 1) delta *= 16;
@@ -924,6 +911,7 @@
         if (destroyed || !isActive) return;
         if (!event.touches.length) return;
         const touch = event.touches[0];
+        lastInputType = "touch";
         touchY = touch.clientY;
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
@@ -983,12 +971,6 @@
                 touchStartTarget = target;
             } else if (activatingSegment === -1) {
                 updateCopy(activeSegment);
-                const video = videos[activeVideo];
-                if (video && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
-                    const time = clamp(desired.local * Math.max(0, video.duration - 0.035), 0, video.duration);
-                    seekMobilePassage(video, time);
-                    if (!video.paused) video.pause();
-                }
             }
         } else if (currentSeg.type === "loop") {
             const deltaY = touchY - touch.clientY;
@@ -1031,18 +1013,18 @@
         isMobileTouchActive = false;
         touchIsScrolling = false;
         touchY = null;
-        smooth = target;
-
         const currentSeg = segments[activeSegment];
         const video = videos[activeVideo];
         if (currentSeg && currentSeg.type === "passage" && video) {
             if (!video.paused) video.pause();
-            if (Number.isFinite(video.duration) && video.duration > 0) {
-                const desired = segmentAt(smooth);
-                const time = clamp(desired.local * Math.max(0, video.duration - 0.035), 0, video.duration);
-                seekMobilePassage(video, time);
+            if (Number.isFinite(video.duration) && video.duration > 0 && activatingSegment === -1) {
+                const maxTime = Math.max(0.001, video.duration - 0.035);
+                const currentLocal = clamp(video.currentTime / maxTime, 0, 1);
+                const segSpan = currentSeg.weight / totalWeight;
+                target = clamp(starts[activeSegment] + currentLocal * segSpan, starts[activeSegment], starts[activeSegment] + segSpan - 0.00001);
             }
         }
+        smooth = target;
     }
 
     function handleTouchCancel() {
@@ -1096,6 +1078,8 @@
         if (destroyed || !isActive) return;
         const firstSegment = segments.findIndex(segment => segment.stage === stage);
         if (firstSegment < 0) return;
+        lastInputType = "wheel";
+        isMobileTouchActive = false;
         pendingLoopNext = null;
         allowLoopTransition = true;
         loopScrollBoost = 0;
@@ -1172,12 +1156,32 @@
                 if (video.paused && !video.ended && video.readyState >= 2) video.play().catch(() => { });
             } else if (segment.type === "passage" && video.readyState >= 2 && Number.isFinite(video.duration) && video.duration > 0) {
                 const time = clamp(chosen.local * Math.max(0, video.duration - 0.035), 0, video.duration);
-                if (isMobileTouchActive) {
-                    seekMobilePassage(video, time);
+                const frameDuration = 1 / 24;
+                const targetFrame = Math.round(time / frameDuration);
+                const displayedFrame = Math.round(video.currentTime / frameDuration);
+
+                if (lastInputType === "touch") {
+                    const diff = targetFrame - displayedFrame;
+                    if (isMobileTouchActive) {
+                        // While actively swiping: track targetFrame determined by MOBILE_PASSAGE_SWIPE_PX
+                        if (!video.seeking && diff !== 0) {
+                            const maxFrame = Math.max(0, Math.floor(video.duration * 24 - 1));
+                            const clampedFrame = clamp(targetFrame, 0, maxFrame);
+                            const nextTargetTime = clampedFrame * frameDuration;
+                            if (Math.abs(video.currentTime - nextTargetTime) >= 0.015) {
+                                applyPassageSeek(video, nextTargetTime);
+                            }
+                        }
+                    } else if (activatingSegment === -1 && !video.seeking) {
+                        // When touch has released: preserve the settled displayed frame and keep timeline synchronized
+                        const maxTime = Math.max(0.001, video.duration - 0.035);
+                        const currentLocal = clamp(video.currentTime / maxTime, 0, 1);
+                        const segSpan = segment.weight / totalWeight;
+                        target = clamp(starts[activeSegment] + currentLocal * segSpan, starts[activeSegment], starts[activeSegment] + segSpan - 0.00001);
+                        smooth = target;
+                    }
                 } else {
-                    const frameDuration = 1 / 24;
-                    const targetFrame = Math.round(time / frameDuration);
-                    const displayedFrame = Math.round(video.currentTime / frameDuration);
+                    // Desktop frame stepping (preserved 100% unchanged)
                     if (!video.seeking && displayedFrame !== targetFrame) {
                         const nextFrame = displayedFrame + Math.sign(targetFrame - displayedFrame);
                         const nextTargetTime = nextFrame * frameDuration;
@@ -1270,7 +1274,7 @@
         touchY = null;
         touchIsScrolling = false;
         isMobileTouchActive = false;
-        pendingMobileSeekTime = null;
+        lastInputType = "wheel";
         activatingSegment = -1;
     }
 
@@ -1307,23 +1311,7 @@
         holdMode = false;
         loopScrollBoost = 0;
         lastPromptOpacity = "";
-
-        // Register video seeked listeners for responsive mobile frame updates
-        videos.forEach(v => {
-            if (!v) return;
-            eventManager.add(v, "seeked", () => {
-                if (destroyed || !isActive) return;
-                if (pendingMobileSeekTime !== null) {
-                    const nextTime = pendingMobileSeekTime;
-                    pendingMobileSeekTime = null;
-                    if (Math.abs(v.currentTime - nextTime) >= 0.015) {
-                        try {
-                            v.currentTime = nextTime;
-                        } catch { }
-                    }
-                }
-            });
-        });
+        lastInputType = "wheel";
 
         // Suppress browser context menu on mobile long-press and desktop right-click
         const preventContextMenu = (e) => {
