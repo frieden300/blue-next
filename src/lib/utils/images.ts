@@ -20,3 +20,20 @@ export function getMainListingImage<T extends { sort_order?: number | null }>(
   const sorted = sortListingImages(images);
   return sorted[0];
 }
+
+/**
+ * Resolves the primary image URL from a booking's nested listing relation.
+ * Supports both single-object and array shapes returned by PostgREST.
+ */
+export function getBookingFirstImage(booking?: {
+  listings?:
+    | { listing_images?: { url: string; sort_order?: number | null }[] | null }
+    | { listing_images?: { url: string; sort_order?: number | null }[] | null }[]
+    | null;
+} | null): string | null {
+  if (!booking?.listings) return null;
+  const listing = Array.isArray(booking.listings)
+    ? booking.listings[0]
+    : booking.listings;
+  return getMainListingImage(listing?.listing_images)?.url ?? null;
+}

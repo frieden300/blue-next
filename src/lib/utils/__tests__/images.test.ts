@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sortListingImages, getMainListingImage } from "../images";
+import { sortListingImages, getMainListingImage, getBookingFirstImage } from "../images";
 
 describe("image utils", () => {
   describe("sortListingImages", () => {
@@ -73,6 +73,43 @@ describe("image utils", () => {
       expect(getMainListingImage([])).toBeUndefined();
       expect(getMainListingImage(null)).toBeUndefined();
       expect(getMainListingImage(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("getBookingFirstImage", () => {
+    it("returns primary image url from a single listing relation object", () => {
+      const booking = {
+        listings: {
+          listing_images: [
+            { url: "https://example.com/sec.jpg", sort_order: 2 },
+            { url: "https://example.com/first.jpg", sort_order: 0 },
+          ],
+        },
+      };
+
+      expect(getBookingFirstImage(booking)).toBe("https://example.com/first.jpg");
+    });
+
+    it("returns primary image url from an array-shaped listing relation", () => {
+      const booking = {
+        listings: [
+          {
+            listing_images: [
+              { url: "https://example.com/array-lead.jpg", sort_order: 0 },
+            ],
+          },
+        ],
+      };
+
+      expect(getBookingFirstImage(booking)).toBe("https://example.com/array-lead.jpg");
+    });
+
+    it("returns null when listings relation or images are missing", () => {
+      expect(getBookingFirstImage(null)).toBeNull();
+      expect(getBookingFirstImage(undefined)).toBeNull();
+      expect(getBookingFirstImage({})).toBeNull();
+      expect(getBookingFirstImage({ listings: null })).toBeNull();
+      expect(getBookingFirstImage({ listings: { listing_images: [] } })).toBeNull();
     });
   });
 });

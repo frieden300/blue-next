@@ -14,8 +14,18 @@ export interface Order {
   order_items: OrderItem[];
 }
 
+export interface BookingListingImage {
+  url: string;
+  sort_order?: number | null;
+}
+
+export interface BookingListing {
+  listing_images?: BookingListingImage[] | null;
+}
+
 export interface RentalBooking {
   id: string;
+  listing_id?: string | null;
   listing_title: string;
   pickup_date: string;
   return_date: string;
@@ -26,10 +36,12 @@ export interface RentalBooking {
   quantity?: number;
   status: string;
   created_at: string;
+  listings?: BookingListing | BookingListing[] | null;
 }
 
 export interface ExperienceBooking {
   id: string;
+  listing_id?: string | null;
   listing_title: string;
   booking_date: string;
   guests: number;
@@ -37,4 +49,5 @@ export interface ExperienceBooking {
   total_amount: number;
   status: string;
   created_at: string;
+  listings?: BookingListing | BookingListing[] | null;
 }

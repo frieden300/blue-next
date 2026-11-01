@@ -168,6 +168,15 @@
   align-items: flex-start;
   gap: 12px;
 }
+.booking-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.booking-card-title-group > div {
+  min-width: 0;
+}
 .booking-card-label {
   font-size: 10px;
   font-weight: 700;

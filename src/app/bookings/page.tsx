@@ -7,6 +7,7 @@ import Link from "next/link";
 import CancelBookingButton from "@/components/marketplace/CancelBookingButton";
 import { formatDisplayDate } from "@/lib/utils/dates";
 import { formatINR } from "@/lib/utils/pricing";
+import { getBookingFirstImage } from "@/lib/utils/images";
 import type {
   Order,
   RentalBooking,
@@ -82,9 +83,12 @@ async function BookingsContent() {
     supabase
       .from("rental_bookings")
       .select(`
-        id, listing_title, pickup_date, return_date,
+        id, listing_id, listing_title, pickup_date, return_date,
         duration_days, daily_rate, rental_total, deposit_amount,
-        quantity, status, created_at
+        quantity, status, created_at,
+        listings (
+          listing_images ( url, sort_order )
+        )
       `)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -92,8 +96,11 @@ async function BookingsContent() {
     supabase
       .from("experience_bookings")
       .select(`
-        id, listing_title, booking_date, guests,
-        unit_price, total_amount, status, created_at
+        id, listing_id, listing_title, booking_date, guests,
+        unit_price, total_amount, status, created_at,
+        listings (
+          listing_images ( url, sort_order )
+        )
       `)
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -138,20 +145,32 @@ async function BookingsContent() {
                 <span aria-hidden="true">🌊</span> Experience Reservations
               </h2>
               <div className="bookings-list">
-                {experiences.map((exp) => (
-                  <div key={exp.id} className="booking-card">
-                    <div className="booking-card-header">
-                      <div>
-                        <p className="booking-card-label">Experience</p>
-                        <p className="booking-card-ref rental-card-title">{exp.listing_title}</p>
+                {experiences.map((exp) => {
+                  const firstImage = getBookingFirstImage(exp);
+                  return (
+                    <div key={exp.id} className="booking-card">
+                      <div className="booking-card-header">
+                        <div className="booking-card-title-group">
+                          {firstImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={firstImage}
+                              alt={exp.listing_title}
+                              className="booking-item-thumb"
+                            />
+                          )}
+                          <div>
+                            <p className="booking-card-label">Experience</p>
+                            <p className="booking-card-ref rental-card-title">{exp.listing_title}</p>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                          <span className={`booking-status-badge status-${exp.status}`}>
+                            {exp.status}
+                          </span>
+                          <CancelBookingButton type="experience" id={exp.id} status={exp.status} />
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                        <span className={`booking-status-badge status-${exp.status}`}>
-                          {exp.status}
-                        </span>
-                        <CancelBookingButton type="experience" id={exp.id} status={exp.status} />
-                      </div>
-                    </div>
 
                     <div className="rental-booking-details">
                       <div className="rental-detail-row">
@@ -180,7 +199,8 @@ async function BookingsContent() {
                       <span className="booking-ref-small">ref: {exp.id.slice(0, 8)}…</span>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </section>
           )}
@@ -252,20 +272,32 @@ async function BookingsContent() {
                 <span aria-hidden="true">⚓</span> Equipment Rentals
               </h2>
               <div className="bookings-list">
-                {rentals.map((rental) => (
-                  <div key={rental.id} className="booking-card">
-                    <div className="booking-card-header">
-                      <div>
-                        <p className="booking-card-label">Rental</p>
-                        <p className="booking-card-ref rental-card-title">{rental.listing_title}</p>
+                {rentals.map((rental) => {
+                  const firstImage = getBookingFirstImage(rental);
+                  return (
+                    <div key={rental.id} className="booking-card">
+                      <div className="booking-card-header">
+                        <div className="booking-card-title-group">
+                          {firstImage && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={firstImage}
+                              alt={rental.listing_title}
+                              className="booking-item-thumb"
+                            />
+                          )}
+                          <div>
+                            <p className="booking-card-label">Rental</p>
+                            <p className="booking-card-ref rental-card-title">{rental.listing_title}</p>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                          <span className={`booking-status-badge status-${rental.status}`}>
+                            {rental.status}
+                          </span>
+                          <CancelBookingButton type="rental" id={rental.id} status={rental.status} />
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                        <span className={`booking-status-badge status-${rental.status}`}>
-                          {rental.status}
-                        </span>
-                        <CancelBookingButton type="rental" id={rental.id} status={rental.status} />
-                      </div>
-                    </div>
 
                     <div className="rental-booking-details">
                       <div className="rental-detail-row">
@@ -306,7 +338,8 @@ async function BookingsContent() {
                       <span className="booking-ref-small">ref: {rental.id.slice(0, 8)}…</span>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </section>
           )}
