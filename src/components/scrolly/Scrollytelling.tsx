@@ -200,7 +200,19 @@ export default function Scrollytelling() {
                 <Link href="/bookings" onClick={() => setMenuOpen(false)}><span>04</span><strong>My bookings</strong><small>Your planned adventures</small></Link>
               </div>
             </div>
-            <Link className="logo" href="/" aria-label="Blue home">BL<span>U</span>E<span className="dot">.</span></Link>
+            <Link
+              className="logo"
+              href="/"
+              aria-label="Blue home"
+              onClick={() => {
+                setMenuOpen(false);
+                if (typeof (window as unknown as { __blueScrollyReset?: () => void }).__blueScrollyReset === "function") {
+                  (window as unknown as { __blueScrollyReset: () => void }).__blueScrollyReset();
+                }
+              }}
+            >
+              BL<span>U</span>E<span className="dot">.</span>
+            </Link>
           </div>
           <div className="topnote">A JOURNEY INTO THE OCEAN</div>
           <div className="edition">BLUE JOURNEY / 01—07<i /></div>
@@ -210,12 +222,6 @@ export default function Scrollytelling() {
           <div className="journey-cta-bob">
             <div className="journey-cta-card">
               <span className="cta-glass-sheen" aria-hidden="true" />
-              <span className="journey-cta-icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="12" cy="12" r="9.5" strokeOpacity="0.4" />
-                  <polygon points="12 4.5 14.5 9.5 20 12 14.5 14.5 12 19.5 9.5 14.5 4 12 9.5 9.5 12 4.5" fill="currentColor" fillOpacity="0.28" />
-                </svg>
-              </span>
               <div className="journey-cta-text">
                 <span className="journey-cta-label">CONTINUE YOUR JOURNEY</span>
                 <span className="journey-cta-title">Explore the BLUE</span>
@@ -265,7 +271,7 @@ export default function Scrollytelling() {
         <div className="side-note">AMBIENT SOUND · TOGGLE ANYTIME</div>
       </main>
       <Script
-        src="/assets/scrollytelling.js?v=20261031c"
+        src="/assets/scrollytelling.js?v=20261101b"
         strategy="afterInteractive"
         onLoad={() => {
           if (typeof (window as unknown as { __blueScrollyInit?: () => void }).__blueScrollyInit === "function") {

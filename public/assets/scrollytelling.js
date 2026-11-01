@@ -553,8 +553,10 @@
         }
         pendingLoopNext = null;
         allowLoopTransition = false;
-        target = starts[activeSegment] + 0.00001;
-        smooth = target;
+        if (target >= starts[activeSegment]) {
+            target = starts[activeSegment] + 0.00001;
+            smooth = target;
+        }
         restartLoop(video, segment);
     }
 
@@ -910,16 +912,12 @@
         const currentSeg = segments[activeSegment];
         if (currentSeg && currentSeg.type === "loop") {
             const isStage0 = currentSeg.stage === 0;
-            if (delta > 0) {
-                const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
-                const impulse = (Math.abs(delta) / 100) * (multiplier * 0.45);
-                loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
-                lastInputAt = performance.now();
-                audioMgr.duck();
-                audioMgr.scheduledUnduck();
-            } else if (delta < 0) {
-                loopScrollBoost = 0;
-            }
+            const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
+            const impulse = (Math.abs(delta) / 100) * (multiplier * 0.45);
+            loopScrollBoost = Math.min(15.0, loopScrollBoost + impulse);
+            lastInputAt = performance.now();
+            audioMgr.duck();
+            audioMgr.scheduledUnduck();
             if (delta > 0) {
                 const loopMultiplier = isStage0 ? 0.7 : 0.35;
                 advanceVirtualScroll(delta * loopMultiplier);
@@ -1079,7 +1077,15 @@
             advanceVirtualScroll(event.key === " " ? window.innerHeight * 0.7 : window.innerHeight * 0.35);
         } else if (["ArrowUp", "PageUp"].includes(event.key)) {
             event.preventDefault();
-            loopScrollBoost = 0;
+            const currentSeg = segments[activeSegment];
+            if (currentSeg && currentSeg.type === "loop") {
+                const isStage0 = currentSeg.stage === 0;
+                const multiplier = isStage0 ? V1L_SCROLL_SPEED_MULTIPLIER : DEFAULT_LOOP_SCROLL_SPEED_MULTIPLIER;
+                loopScrollBoost = Math.min(15.0, loopScrollBoost + multiplier * 0.75);
+                lastInputAt = performance.now();
+                audioMgr.duck();
+                audioMgr.scheduledUnduck();
+            }
             advanceVirtualScroll(-window.innerHeight * 0.35);
         } else if (event.key === "Home") {
             event.preventDefault();
@@ -1298,6 +1304,11 @@
             audioMgr.destroy();
         }
 
+        activeVideo = 0;
+        activeSegment = 0;
+        target = 0;
+        smooth = 0;
+        loadToken = 0;
         loopScrollBoost = 0;
         holdMode = false;
         touchY = null;
@@ -1429,6 +1440,16 @@
             prompt.classList.remove("is-hidden");
         }
 
+        // Reset scroll position and explicitly synchronize DOM to Section 0
+        if (typeof window !== "undefined" && window.scrollTo) {
+            try { window.scrollTo(0, 0); } catch { }
+        }
+        if (eyebrow) eyebrow.textContent = segments[0].eyebrow;
+        if (heading) heading.innerHTML = segments[0].title;
+        if (description) description.textContent = segments[0].description;
+        if (copy) copy.classList.remove("changing", "entering");
+        updateCopy(0);
+
         const first = videos[0];
         const second = videos[1];
         if (second) {
@@ -1458,4 +1479,11 @@
     boot();
     window.__blueScrollyDestroy = destroy;
     window.__blueScrollyInit = boot;
+    window.__blueScrollyReset = () => {
+        if (isActive && !destroyed) {
+            goToStage(0);
+        } else {
+            boot();
+        }
+    };
 })();
