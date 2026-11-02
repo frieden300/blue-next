@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { signupAction, type ActionState } from "@/app/account/actions";
 
 const initialState: ActionState = {};
@@ -19,8 +20,23 @@ export default function SignupForm() {
 
       {state.info && (
         <div className="auth-alert auth-alert-info" role="status">
-          <span>ℹ️</span>
-          <span>{state.info}</span>
+          <span aria-hidden="true">ℹ️</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span>{state.info}</span>
+            <Link
+              href="/account/login"
+              style={{
+                color: "var(--white)",
+                fontWeight: 600,
+                textDecoration: "underline",
+                fontSize: "12px",
+                width: "fit-content",
+                marginTop: "2px",
+              }}
+            >
+              Sign In to Your Account →
+            </Link>
+          </div>
         </div>
       )}
 

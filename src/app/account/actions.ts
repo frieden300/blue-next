@@ -35,7 +35,7 @@ export async function loginAction(
     if (error.message.includes("Email not confirmed")) {
       return {
         error:
-          "Email not confirmed. Please check your inbox or disable email confirmation in Supabase Auth settings.",
+          "Email address not confirmed. Please check your inbox to confirm your email, then log in again.",
       };
     }
     return { error: error.message };
@@ -89,7 +89,7 @@ export async function signupAction(
   if (data.user && !data.session) {
     return {
       info:
-        "Registration successful! If your Supabase project has email confirmation enabled, check your inbox to confirm your email before signing in.",
+        "Registration successful! Please check your inbox to confirm your email address, then log in to your account.",
     };
   }
 

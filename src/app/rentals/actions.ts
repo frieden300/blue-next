@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isValidUUID, isValidBookingQuantity } from "@/lib/utils/validation";
-import { calculateRentalDays } from "@/lib/utils/dates";
+import { calculateRentalDays, getTodayISO, getTomorrowISO, isTodayRentalPickupClosed } from "@/lib/utils/dates";
 
 export interface RentalBookingInput {
   listingId: string;
@@ -51,6 +51,11 @@ export async function confirmRentalBookingAction(
   }
   if (pickup < today) {
     return { error: "Pickup date cannot be in the past." };
+  }
+  if (pickupDate === getTodayISO() && isTodayRentalPickupClosed()) {
+    return {
+      error: "Pickup hours for today (08:00 — 18:00) have ended. Please select tomorrow or a later date for equipment pickup.",
+    };
   }
   if (ret <= pickup) {
     return { error: "Return date must be after the pickup date." };
@@ -128,6 +133,15 @@ export async function checkRentalAvailabilityAction(
 ): Promise<RentalAvailabilityResult> {
   if (!isValidUUID(listingId) || !pickupDate || !returnDate) {
     return { available: false, error: "Missing required date fields." };
+  }
+
+  if (pickupDate === getTodayISO() && isTodayRentalPickupClosed()) {
+    return {
+      available: false,
+      remaining: 0,
+      nextAvailableDate: getTomorrowISO(),
+      error: "Pickup hours for today (08:00 — 18:00) have ended.",
+    };
   }
 
   const supabase = await createClient();

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { isValidUUID, isValidBookingQuantity } from "@/lib/utils/validation";
+import { getTodayISO, isSessionTimePassed } from "@/lib/utils/dates";
 
 export interface ExperienceBookingInput {
   listingId: string;
@@ -19,6 +20,17 @@ export interface ExperienceBookingResult {
   unitPrice?: number;
   guests?: number;
   error?: string;
+}
+
+export interface SessionAvailabilityItem {
+  sessionId: string;
+  departureTime: string;
+  label: string | null;
+  maxCapacity: number;
+  bookedGuests: number;
+  availableSpots: number;
+  isAvailable: boolean;
+  isPast?: boolean;
 }
 
 export async function confirmExperienceBookingAction(
@@ -66,6 +78,21 @@ export async function confirmExperienceBookingAction(
 
   if (!user) {
     return { error: "You must be signed in to book an experience." };
+  }
+
+  // If booking for today and a specific session is selected, verify session time has not passed
+  if (input.sessionId && bookingDate === getTodayISO()) {
+    const { data: sess } = await supabase
+      .from("experience_sessions")
+      .select("departure_time")
+      .eq("id", input.sessionId)
+      .maybeSingle();
+
+    if (sess && isSessionTimePassed(sess.departure_time, bookingDate)) {
+      return {
+        error: "The departure time for this session today has already passed. Please choose a later time slot or future date.",
+      };
+    }
   }
 
   // Atomically lock listing row, check calendar date/session capacity, derive price, and insert reservation
@@ -156,10 +183,12 @@ export async function getExperienceSessionsAvailabilityAction(
             : r.remaining_spots !== undefined
             ? Number(r.remaining_spots)
             : Math.max(0, maxCap - booked);
+        const isPast = isSessionTimePassed(r.departure_time, bookingDate);
         const isAvail =
-          r.is_available !== undefined
+          !isPast &&
+          (r.is_available !== undefined
             ? Boolean(r.is_available)
-            : r.status === "active";
+            : r.status === "active");
 
         return {
           sessionId: id,
@@ -169,6 +198,7 @@ export async function getExperienceSessionsAvailabilityAction(
           bookedGuests: booked,
           availableSpots: isNaN(spots) ? 0 : Math.max(0, spots),
           isAvailable: isAvail,
+          isPast,
         };
       }),
     };

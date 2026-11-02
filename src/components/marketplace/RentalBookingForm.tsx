@@ -2,7 +2,14 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { confirmRentalBookingAction, checkRentalAvailabilityAction } from "@/app/rentals/actions";
-import { todayStr, tomorrowStr, calculateRentalDays, formatDisplayDate } from "@/lib/utils/dates";
+import {
+  calculateRentalDays,
+  formatDisplayDate,
+  getEarliestRentalPickupDate,
+  isTodayRentalPickupClosed,
+  getTodayISO,
+  getTomorrowISO,
+} from "@/lib/utils/dates";
 import { calculateRentalPricing, formatINR } from "@/lib/utils/pricing";
 
 interface RentalBookingFormProps {
@@ -18,8 +25,16 @@ export default function RentalBookingForm({
   dailyRate,
   inventoryCount = 5,
 }: RentalBookingFormProps) {
-  const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(tomorrowStr);
+  const [startDate, setStartDate] = useState(getEarliestRentalPickupDate);
+  const [endDate, setEndDate] = useState(() => {
+    const earliest = getEarliestRentalPickupDate();
+    if (earliest === getTodayISO()) return getTomorrowISO();
+    const d = new Date(Date.now() + 2 * 86_400_000);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  });
   const [quantity, setQuantity] = useState(1);
   const [isPending, startTransition] = useTransition();
   const [dateError, setDateError] = useState<string | null>(null);
@@ -89,6 +104,11 @@ export default function RentalBookingForm({
     e.preventDefault();
     setDateError(null);
     setServerError(null);
+
+    if (startDate === getTodayISO() && isTodayRentalPickupClosed()) {
+      setDateError("Pickup hours for today (08:00 — 18:00) have ended. Please select tomorrow or a later date.");
+      return;
+    }
 
     if (endDate <= startDate) {
       setDateError("Return date must be after the pickup date.");
@@ -200,11 +220,16 @@ export default function RentalBookingForm({
             <input
               id={`rental-start-${listingId}`}
               type="date"
-              min={todayStr()}
+              min={getEarliestRentalPickupDate()}
               value={startDate}
               onChange={(e) => handleStartChange(e.target.value)}
               required
             />
+            {isTodayRentalPickupClosed() && (
+              <p style={{ fontSize: "11px", color: "var(--muted)", margin: "4px 0 0" }}>
+                ℹ️ Today&apos;s pickup hours (08:00 &mdash; 18:00) have ended.
+              </p>
+            )}
           </div>
           <div className="date-field">
             <label htmlFor={`rental-end-${listingId}`}>Return Date</label>

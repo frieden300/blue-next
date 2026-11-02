@@ -173,9 +173,11 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 1;
 }
 .booking-card-title-group > div {
   min-width: 0;
+  flex: 1;
 }
 .booking-card-label {
   font-size: 10px;
@@ -194,27 +196,99 @@
 .rental-card-title {
   font-family: var(--font-sans);
   font-size: 14px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.booking-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .booking-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 4px 10px;
   border-radius: 999px;
+  white-space: nowrap;
   flex-shrink: 0;
+  line-height: 1.35;
 }
 .status-confirmed {
   background: rgba(34, 197, 94, 0.15);
   color: #86efac;
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
+.status-completed {
+  background: rgba(130, 217, 237, 0.12);
+  color: var(--blue, #82d9ed);
+  border: 1px solid rgba(130, 217, 237, 0.28);
+  backdrop-filter: blur(8px);
+}
+.status-active {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+  gap: 5px;
+}
+.status-active::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  animation: pulse-active 2s infinite ease-in-out;
+}
+@keyframes pulse-active {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
 .status-cancelled {
   background: rgba(239, 68, 68, 0.12);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
+
+.booking-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue, #82d9ed);
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(130, 217, 237, 0.25);
+  background: rgba(130, 217, 237, 0.08);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.booking-action-link:hover {
+  background: rgba(130, 217, 237, 0.2);
+  border-color: rgba(130, 217, 237, 0.5);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(130, 217, 237, 0.2);
+}
+
 
 /* Order items */
 .booking-items-list {

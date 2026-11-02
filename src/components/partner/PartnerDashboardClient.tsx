@@ -19,6 +19,7 @@ import {
   SUBCAT_LABEL,
   normalizeSubcategory,
 } from "@/lib/constants/marketplace";
+import { formatTime12h } from "@/lib/utils/dates";
 import type { ListingImage, ExperienceSession } from "@/types/marketplace";
 
 export type { ExperienceSession };
@@ -1238,7 +1239,7 @@ function ManageSessionsModal({
   const [sessions, setSessions] = useState<ExperienceSession[]>(
     listing.experience_sessions ?? []
   );
-  const [newTime, setNewTime] = useState("09:00 AM");
+  const [newTime, setNewTime] = useState("09:00");
   const [newCapacity, setNewCapacity] = useState(listing.max_capacity ?? 10);
   const [newLabel, setNewLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1252,9 +1253,10 @@ function ManageSessionsModal({
     setSuccessMsg(null);
     setIsSubmitting(true);
 
+    const formattedTime = formatTime12h(newTime);
     const res = await createExperienceSessionAction(
       listing.id,
-      newTime,
+      formattedTime,
       newCapacity,
       newLabel || undefined
     );
@@ -1269,6 +1271,7 @@ function ManageSessionsModal({
         setSessions(nextSessions);
         onSessionsUpdated?.(listing.id, nextSessions);
       }
+      setNewTime("09:00");
       setNewLabel("");
     }
   };
@@ -1357,7 +1360,7 @@ function ManageSessionsModal({
                 >
                   <div>
                     <span style={{ fontWeight: 600, color: "var(--white)", marginRight: "8px" }}>
-                      ⏰ {sess.departure_time}
+                      ⏰ {formatTime12h(sess.departure_time)}
                     </span>
                     {sess.label && (
                       <span style={{ fontSize: "12px", color: "var(--blue)", marginRight: "8px" }}>
@@ -1418,12 +1421,12 @@ function ManageSessionsModal({
                 <div>
                   <label className="pf-label" style={{ fontSize: "11px" }}>Departure Time</label>
                   <input
-                    type="text"
+                    type="time"
                     className="pf-input"
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
                     required
-                    placeholder="e.g. 09:00 AM or 14:00"
+                    style={{ colorScheme: "dark" }}
                   />
                 </div>
                 <div>

@@ -235,7 +235,7 @@ BEGIN
     p_listing_id,
     v_listing.title,
     p_booking_date,
-    v_departure_label,
+    coalesce(v_session.departure_time, v_departure_label),
     p_session_id,
     p_guests,
     v_unit_price,
@@ -249,7 +249,7 @@ BEGIN
     'total_amount', v_total_amount,
     'unit_price', v_unit_price,
     'guests', p_guests,
-    'departure_time', v_departure_label
+    'departure_time', coalesce(v_session.departure_time, v_departure_label)
   );
 END;
 $$;

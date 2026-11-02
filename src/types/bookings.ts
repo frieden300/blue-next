@@ -19,8 +19,16 @@ export interface BookingListingImage {
   sort_order?: number | null;
 }
 
+export interface BookingListingSession {
+  id?: string;
+  departure_time?: string | null;
+  label?: string | null;
+}
+
 export interface BookingListing {
+  duration_hours?: number | null;
   listing_images?: BookingListingImage[] | null;
+  experience_sessions?: BookingListingSession[] | null;
 }
 
 export interface RentalBooking {
@@ -44,10 +52,15 @@ export interface ExperienceBooking {
   listing_id?: string | null;
   listing_title: string;
   booking_date: string;
+  departure_time?: string | null;
+  session_id?: string | null;
+  duration_hours?: number | null;
   guests: number;
   unit_price: number;
   total_amount: number;
   status: string;
   created_at: string;
   listings?: BookingListing | BookingListing[] | null;
+  experience_sessions?: BookingListingSession | BookingListingSession[] | null;
 }
+

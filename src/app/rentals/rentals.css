@@ -645,6 +645,40 @@
   gap: 14px;
 }
 
+.rental-specs-card .specs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.rental-specs-card .spec-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rental-specs-card .spec-name {
+  font-size: 11px;
+  color: rgba(232, 244, 248, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+.rental-specs-card .spec-val {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--white);
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .rental-specs-card .specs-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
 /* Reservation Box (RentalBookingForm) */
 .rental-reservation-card {
   padding: 26px;

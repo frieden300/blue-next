@@ -7,7 +7,13 @@ import {
   getExperienceSessionsAvailabilityAction,
   type SessionAvailabilityItem,
 } from "@/app/explore/actions";
-import { todayStr, tomorrowStr, formatDisplayDate } from "@/lib/utils/dates";
+import {
+  todayStr,
+  tomorrowStr,
+  formatDisplayDate,
+  formatTime12h,
+  isSessionTimePassed,
+} from "@/lib/utils/dates";
 import { calculateExperienceTotal, formatINR } from "@/lib/utils/pricing";
 import type { ExperienceSession } from "@/types/marketplace";
 
@@ -81,30 +87,44 @@ export default function ExperienceBookingForm({
       if (res.sessions && res.sessions.length > 0) {
         setSessions(res.sessions);
         setSelectedSessionId((current) => {
-          // Keep current if still valid, active, and fits the selected guests
+          // Keep current if still valid, active, not passed today, and fits the selected guests
           if (
             current &&
             res.sessions?.some(
-              (s) => s.sessionId === current && s.isAvailable && s.availableSpots >= guests
+              (s) =>
+                s.sessionId === current &&
+                s.isAvailable &&
+                !isSessionTimePassed(s.departureTime, bookingDate) &&
+                s.availableSpots >= guests
             )
           ) {
             return current;
           }
-          // Otherwise auto-select the first slot with enough capacity
+          // Otherwise auto-select the first slot with enough capacity that has not passed
           const firstFitting = res.sessions?.find(
-            (s) => s.isAvailable && s.availableSpots >= guests
+            (s) =>
+              s.isAvailable &&
+              !isSessionTimePassed(s.departureTime, bookingDate) &&
+              s.availableSpots >= guests
           );
           if (firstFitting) return firstFitting.sessionId;
 
-          // Or the first slot that has any remaining capacity
+          // Or the first slot that has any remaining capacity and not passed
           const firstWithSpots = res.sessions?.find(
-            (s) => s.isAvailable && s.availableSpots > 0
+            (s) =>
+              s.isAvailable &&
+              !isSessionTimePassed(s.departureTime, bookingDate) &&
+              s.availableSpots > 0
           );
           if (firstWithSpots) return firstWithSpots.sessionId;
 
-          // Fallback to first active session, or first session
-          const firstActive = res.sessions?.find((s) => s.isAvailable);
-          return firstActive ? firstActive.sessionId : res.sessions![0].sessionId;
+          // Fallback to first unpassed active session, or first session
+          const firstActiveUnpassed = res.sessions?.find(
+            (s) => s.isAvailable && !isSessionTimePassed(s.departureTime, bookingDate)
+          );
+          if (firstActiveUnpassed) return firstActiveUnpassed.sessionId;
+
+          return res.sessions![0]?.sessionId ?? null;
         });
       }
     });
@@ -115,11 +135,15 @@ export default function ExperienceBookingForm({
   }, [listingId, bookingDate, guests, hasConfiguredSessions]);
 
   const selectedSession = sessions.find((s) => s.sessionId === selectedSessionId);
+  const isSelectedSessionPast = Boolean(
+    selectedSession && isSessionTimePassed(selectedSession.departureTime, bookingDate)
+  );
 
   const isSelectedSessionBookable =
     !hasConfiguredSessions ||
     (Boolean(selectedSession) &&
       Boolean(selectedSession?.isAvailable) &&
+      !isSelectedSessionPast &&
       (selectedSession?.availableSpots ?? 0) >= guests);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -139,6 +163,10 @@ export default function ExperienceBookingForm({
       }
       if (!selectedSession) {
         setServerError("Selected departure time slot not found. Please choose an available slot.");
+        return;
+      }
+      if (isSessionTimePassed(selectedSession.departureTime, bookingDate)) {
+        setServerError("The departure time for this session has already passed today. Please select a later slot or another date.");
         return;
       }
       if (!selectedSession.isAvailable) {
@@ -205,7 +233,7 @@ export default function ExperienceBookingForm({
           {result.departureTime && (
             <div className="rental-conf-row">
               <span>Departure</span>
-              <span>{result.departureTime.slice(0, 5)}</span>
+              <span>{formatTime12h(result.departureTime)}</span>
             </div>
           )}
           <div className="rental-conf-row">
@@ -359,10 +387,12 @@ export default function ExperienceBookingForm({
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(135px, 1fr))", gap: "8px" }}>
               {sessions.map((s) => {
+                const isPast = Boolean(s.isPast) || isSessionTimePassed(s.departureTime, bookingDate);
                 const isFull = s.availableSpots <= 0 || !s.isAvailable;
                 const cannotFit = s.availableSpots < guests;
-                const disabled = isFull || cannotFit;
+                const disabled = isPast || isFull || cannotFit;
                 const isSelected = selectedSessionId === s.sessionId;
+                const displayTime = formatTime12h(s.departureTime);
 
                 return (
                   <button
@@ -386,16 +416,18 @@ export default function ExperienceBookingForm({
                     }}
                   >
                     <div style={{ fontWeight: 600, fontSize: "13px" }}>
-                      ⏱ {s.departureTime.slice(0, 5)} {s.label ? `• ${s.label}` : ""}
+                      ⏱ {displayTime}
                     </div>
                     <div
                       style={{
                         fontSize: "11px",
-                        color: isFull ? "#f87171" : cannotFit ? "#fbbf24" : "var(--muted)",
+                        color: isPast ? "#94a3b8" : isFull ? "#f87171" : cannotFit ? "#fbbf24" : "var(--muted)",
                         marginTop: "3px",
                       }}
                     >
-                      {isFull
+                      {isPast
+                        ? "Time Passed"
+                        : isFull
                         ? "Sold Out"
                         : cannotFit
                         ? `Only ${s.availableSpots} spots left`
@@ -404,6 +436,42 @@ export default function ExperienceBookingForm({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Dedicated slot label space below departure slot buttons */}
+            <div
+              style={{
+                minHeight: "36px",
+                padding: "8px 12px",
+                borderRadius: "10px",
+                background: selectedSession?.label
+                  ? "rgba(14, 165, 233, 0.08)"
+                  : "rgba(3, 17, 28, 0.35)",
+                border: selectedSession?.label
+                  ? "1px solid rgba(130, 217, 237, 0.28)"
+                  : "1px dashed rgba(255, 255, 255, 0.08)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "12px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              {selectedSession?.label ? (
+                <>
+                  <span style={{ fontSize: "13px" }} aria-hidden="true">🏷️</span>
+                  <span style={{ color: "var(--muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700 }}>
+                    Slot Note:
+                  </span>
+                  <span style={{ color: "var(--blue)", fontWeight: 500 }}>
+                    {selectedSession.label}
+                  </span>
+                </>
+              ) : (
+                <span style={{ color: "var(--muted)", opacity: 0.65, fontSize: "11px", fontStyle: "italic" }}>
+                  Standard departure &bull; No special slot note for {selectedSession ? formatTime12h(selectedSession.departureTime) : "this time"}
+                </span>
+              )}
             </div>
           </div>
         ) : (
@@ -428,6 +496,21 @@ export default function ExperienceBookingForm({
           flexDirection: "column",
           gap: "6px",
         }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
+            {hasConfiguredSessions && selectedSession ? (
+              <>
+                <span>Selected Time</span>
+                <span style={{ color: "var(--blue)", fontWeight: 600 }}>
+                  ⏱ {formatTime12h(selectedSession.departureTime)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>Schedule</span>
+                <span style={{ color: "var(--white)", fontWeight: 500 }}>Daily Departure</span>
+              </>
+            )}
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)" }}>
             <span>Rate</span>
             <span>{formatINR(unitPrice)} × {guests} {guests === 1 ? "guest" : "guests"}</span>
@@ -454,6 +537,8 @@ export default function ExperienceBookingForm({
         >
           {isPending
             ? "Booking Experience…"
+            : hasConfiguredSessions && selectedSession && isSelectedSessionPast
+            ? "Selected Slot Time Passed"
             : hasConfiguredSessions && selectedSession && !selectedSession.isAvailable
             ? "Selected Slot Inactive"
             : hasConfiguredSessions && selectedSession && selectedSession.availableSpots <= 0

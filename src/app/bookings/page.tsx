@@ -5,7 +5,16 @@ import SiteFooter from "@/components/layout/SiteFooter";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import CancelBookingButton from "@/components/marketplace/CancelBookingButton";
-import { formatDisplayDate } from "@/lib/utils/dates";
+import {
+  formatDisplayDate,
+  formatDurationHours,
+  formatTime12h,
+  formatValidTime12h,
+  getTodayISO,
+  extractBookingDurationHours,
+  getExperienceBookingStatus,
+  getRentalBookingStatus,
+} from "@/lib/utils/dates";
 import { formatINR } from "@/lib/utils/pricing";
 import { getBookingFirstImage } from "@/lib/utils/images";
 import type {
@@ -19,6 +28,54 @@ export const metadata = {
   title: "My Bookings — BLUE",
   description: "View your confirmed gear orders, rental bookings, and experience reservations.",
 };
+
+/**
+ * Safely resolves the true departure time for an experience booking.
+ * Ensures that if a partner added a slot label (e.g. "Afternoon" or "Sunset"),
+ * only the actual departure time (e.g. "02:00 PM") is displayed in My Bookings,
+ * never the arbitrary slot label.
+ */
+function getExperienceBookingTime(exp: ExperienceBooking): string | null {
+  // 1. Direct foreign key relation to experience_sessions
+  const directSession = Array.isArray(exp.experience_sessions)
+    ? exp.experience_sessions[0]
+    : exp.experience_sessions;
+  if (directSession?.departure_time) {
+    const formatted = formatValidTime12h(directSession.departure_time);
+    if (formatted) return formatted;
+  }
+
+  // 2. If exp.departure_time itself is already a valid time string
+  const validExpTime = formatValidTime12h(exp.departure_time);
+  if (validExpTime) {
+    return validExpTime;
+  }
+
+  // 3. Fallback: match session on joined listing relation
+  const listingObj = Array.isArray(exp.listings) ? exp.listings[0] : exp.listings;
+  const listingSessions = listingObj?.experience_sessions;
+  if (Array.isArray(listingSessions) && listingSessions.length > 0) {
+    if (exp.session_id) {
+      const matchById = listingSessions.find((s) => s.id === exp.session_id);
+      if (matchById?.departure_time) {
+        const formatted = formatValidTime12h(matchById.departure_time);
+        if (formatted) return formatted;
+      }
+    }
+    if (exp.departure_time) {
+      const matchByLabel = listingSessions.find(
+        (s) => s.label?.trim().toLowerCase() === exp.departure_time?.trim().toLowerCase()
+      );
+      if (matchByLabel?.departure_time) {
+        const formatted = formatValidTime12h(matchByLabel.departure_time);
+        if (formatted) return formatted;
+      }
+    }
+  }
+
+  // If nothing parses as a valid time, return null (never display text labels as Time)
+  return null;
+}
 
 export default function BookingsPage() {
   return (
@@ -96,10 +153,17 @@ async function BookingsContent() {
     supabase
       .from("experience_bookings")
       .select(`
-        id, listing_id, listing_title, booking_date, guests,
+        id, listing_id, listing_title, booking_date, departure_time, session_id, guests,
         unit_price, total_amount, status, created_at,
         listings (
-          listing_images ( url, sort_order )
+          duration_hours,
+          listing_images ( url, sort_order ),
+          experience_sessions ( id, departure_time, label )
+        ),
+        experience_sessions (
+          id,
+          departure_time,
+          label
         )
       `)
       .eq("user_id", user.id)
@@ -111,6 +175,84 @@ async function BookingsContent() {
   const rentals = (rentalsRes.data ?? []) as unknown as RentalBooking[];
   const experiences = (experiencesRes.data ?? []) as unknown as ExperienceBooking[];
   const hasAny = orders.length > 0 || rentals.length > 0 || experiences.length > 0;
+  const today = getTodayISO();
+  const now = new Date();
+
+  // Sort experiences: active in session first (0), upcoming confirmed (1), completed (2), cancelled (3)
+  const sortedExperiences = [...experiences].sort((a, b) => {
+    const durationA = extractBookingDurationHours(a.listings);
+    const durationB = extractBookingDurationHours(b.listings);
+    const timeA = getExperienceBookingTime(a);
+    const timeB = getExperienceBookingTime(b);
+    const statusA = getExperienceBookingStatus({ ...a, departure_time: timeA, duration_hours: durationA }, today, now);
+    const statusB = getExperienceBookingStatus({ ...b, departure_time: timeB, duration_hours: durationB }, today, now);
+
+    const rank = (status: typeof statusA.displayStatus) => {
+      if (status === "active") return 0;
+      if (status === "confirmed") return 1;
+      if (status === "completed") return 2;
+      return 3; // cancelled
+    };
+
+    const rankA = rank(statusA.displayStatus);
+    const rankB = rank(statusB.displayStatus);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    if (rankA <= 1) {
+      if (a.booking_date !== b.booking_date) {
+        return a.booking_date.localeCompare(b.booking_date);
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+
+    if (a.booking_date !== b.booking_date) {
+      return b.booking_date.localeCompare(a.booking_date);
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Sort rentals: active in use first (0), upcoming confirmed (1), completed (2), cancelled (3)
+  const sortedRentals = [...rentals].sort((a, b) => {
+    const statusA = getRentalBookingStatus(a, today);
+    const statusB = getRentalBookingStatus(b, today);
+
+    const rank = (status: typeof statusA.displayStatus) => {
+      if (status === "active") return 0;
+      if (status === "confirmed") return 1;
+      if (status === "completed") return 2;
+      return 3; // cancelled
+    };
+
+    const rankA = rank(statusA.displayStatus);
+    const rankB = rank(statusB.displayStatus);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    if (rankA <= 1) {
+      if (a.pickup_date !== b.pickup_date) {
+        return a.pickup_date.localeCompare(b.pickup_date);
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+
+    if (a.return_date !== b.return_date) {
+      return b.return_date.localeCompare(a.return_date);
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Sort orders: confirmed first, then cancelled, newest created first
+  const sortedOrders = [...orders].sort((a, b) => {
+    const rankA = a.status === "confirmed" ? 0 : 1;
+    const rankB = b.status === "confirmed" ? 0 : 1;
+    if (rankA !== rankB) return rankA - rankB;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   return (
     <div className="bookings-page">
@@ -139,14 +281,23 @@ async function BookingsContent() {
       ) : (
         <div className="bookings-sections">
           {/* ── Experience Reservations ──────────────────────────── */}
-          {experiences.length > 0 && (
+          {sortedExperiences.length > 0 && (
             <section className="bookings-section" aria-labelledby="experiences-heading">
               <h2 id="experiences-heading" className="bookings-section-title">
                 <span aria-hidden="true">🌊</span> Experience Reservations
               </h2>
               <div className="bookings-list">
-                {experiences.map((exp) => {
+                {sortedExperiences.map((exp) => {
+                  const displayTime = getExperienceBookingTime(exp);
                   const firstImage = getBookingFirstImage(exp);
+                  const durationHours = extractBookingDurationHours(exp.listings);
+                  const lifecycle = getExperienceBookingStatus(
+                    { ...exp, departure_time: displayTime, duration_hours: durationHours },
+                    today,
+                    now
+                  );
+                  const durationLabel = formatDurationHours(durationHours);
+
                   return (
                     <div key={exp.id} className="booking-card">
                       <div className="booking-card-header">
@@ -164,11 +315,21 @@ async function BookingsContent() {
                             <p className="booking-card-ref rental-card-title">{exp.listing_title}</p>
                           </div>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                          <span className={`booking-status-badge status-${exp.status}`}>
-                            {exp.status}
+                        <div className="booking-card-actions">
+                          <span className={`booking-status-badge ${lifecycle.badgeClass}`}>
+                            {lifecycle.badgeLabel}
                           </span>
-                          <CancelBookingButton type="experience" id={exp.id} status={exp.status} />
+                          {lifecycle.canCancel && (
+                            <CancelBookingButton type="experience" id={exp.id} status={exp.status} />
+                          )}
+                          {lifecycle.displayStatus === "completed" && (
+                            <Link
+                              href={exp.listing_id ? `/explore/${exp.listing_id}` : "/explore"}
+                              className="booking-action-link"
+                            >
+                              Book Again ↗
+                            </Link>
+                          )}
                         </div>
                       </div>
 
@@ -177,6 +338,18 @@ async function BookingsContent() {
                         <span>Date</span>
                         <span>{formatDisplayDate(exp.booking_date)}</span>
                       </div>
+                      {displayTime && (
+                        <div className="rental-detail-row">
+                          <span>Time</span>
+                          <span>{displayTime}</span>
+                        </div>
+                      )}
+                      {durationLabel && (
+                        <div className="rental-detail-row">
+                          <span>Duration</span>
+                          <span>{durationLabel}</span>
+                        </div>
+                      )}
                       <div className="rental-detail-row">
                         <span>Guests</span>
                         <span>{exp.guests} {exp.guests !== 1 ? "people" : "person"}</span>
@@ -206,24 +379,26 @@ async function BookingsContent() {
           )}
 
           {/* ── Gear Orders ─────────────────────────────────────── */}
-          {orders.length > 0 && (
+          {sortedOrders.length > 0 && (
             <section className="bookings-section" aria-labelledby="orders-heading">
               <h2 id="orders-heading" className="bookings-section-title">
                 <span aria-hidden="true">🤿</span> Gear Orders
               </h2>
               <div className="bookings-list">
-                {orders.map((order) => (
+                {sortedOrders.map((order) => (
                   <div key={order.id} className="booking-card">
                     <div className="booking-card-header">
                       <div>
                         <p className="booking-card-label">Order</p>
                         <p className="booking-card-ref">{order.id.slice(0, 8)}…</p>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+                      <div className="booking-card-actions">
                         <span className={`booking-status-badge status-${order.status}`}>
                           {order.status}
                         </span>
-                        <CancelBookingButton type="order" id={order.id} status={order.status} />
+                        {order.status === "confirmed" && (
+                          <CancelBookingButton type="order" id={order.id} status={order.status} />
+                        )}
                       </div>
                     </div>
 
@@ -266,14 +441,16 @@ async function BookingsContent() {
           )}
 
           {/* ── Rental Bookings ──────────────────────────────────── */}
-          {rentals.length > 0 && (
+          {sortedRentals.length > 0 && (
             <section className="bookings-section" aria-labelledby="rentals-heading">
               <h2 id="rentals-heading" className="bookings-section-title">
                 <span aria-hidden="true">⚓</span> Equipment Rentals
               </h2>
               <div className="bookings-list">
-                {rentals.map((rental) => {
+                {sortedRentals.map((rental) => {
                   const firstImage = getBookingFirstImage(rental);
+                  const lifecycle = getRentalBookingStatus(rental, today);
+
                   return (
                     <div key={rental.id} className="booking-card">
                       <div className="booking-card-header">
@@ -291,11 +468,21 @@ async function BookingsContent() {
                             <p className="booking-card-ref rental-card-title">{rental.listing_title}</p>
                           </div>
                         </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-                          <span className={`booking-status-badge status-${rental.status}`}>
-                            {rental.status}
+                        <div className="booking-card-actions">
+                          <span className={`booking-status-badge ${lifecycle.badgeClass}`}>
+                            {lifecycle.badgeLabel}
                           </span>
-                          <CancelBookingButton type="rental" id={rental.id} status={rental.status} />
+                          {lifecycle.canCancel && (
+                            <CancelBookingButton type="rental" id={rental.id} status={rental.status} />
+                          )}
+                          {lifecycle.displayStatus === "completed" && (
+                            <Link
+                              href={rental.listing_id ? `/rentals/${rental.listing_id}` : "/rentals"}
+                              className="booking-action-link"
+                            >
+                              Rent Again ↗
+                            </Link>
+                          )}
                         </div>
                       </div>
 
@@ -348,3 +535,4 @@ async function BookingsContent() {
     </div>
   );
 }
+

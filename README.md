@@ -13,7 +13,7 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 ![React](https://img.shields.io/badge/React-19.3.0-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Vitest](https://img.shields.io/badge/Vitest-3.x-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-3.2.7-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 [Features](#-features) · [Tech Stack](#-tech-stack) · [Try Project BLUE](#-try-project-blue) · [Developer Setup](#-developer-setup) · [Architecture & Scrollytelling Engine](#-architecture--scrollytelling-engine) · [Database & Integrity](#-database-design--integrity) · [Troubleshooting](#-troubleshooting)
@@ -25,6 +25,7 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 ## 📽️ Demo
 
 <p align="center">
+  <!-- Demo GIF placeholder: drop recording at docs/demo.gif -->
   <img src="docs/demo.gif" alt="Project BLUE Live Demo" width="100%">
 </p>
 
@@ -34,17 +35,18 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 
 ## 🖼️ Screenshots
 
-| Scrollytelling — 7-Stage Orbital to Abyss Descent (`/`) | Deep-Ocean Experiences Marketplace (`/explore`) |
-|:-------------------------------------------------------:|:-----------------------------------------------:|
-| <img src="docs/screenshots/scrollytelling.png" alt="Orbital Scrollytelling Descent" width="100%"> | <img src="docs/screenshots/explore_marketplace.png" alt="Expeditions Marketplace" width="100%"> |
+| Admin Governance & Moderation Queue (`/admin`) | Partner Dashboard — Fleet & Session Control (`/partner/dashboard`) |
+|:----------------------------------------------:|:-----------------------------------------------------------------:|
+| <img src="docs/screenshots/admin_dashboard.png" alt="Admin Dashboard Moderation Queue" width="100%"> | <img src="docs/screenshots/partner_dashboard.png" alt="Partner Dashboard Fleet and Sessions" width="100%"> |
 
-| Equipment Rentals & Date Selection (`/rentals/[id]`) | Unified Customer Bookings Portal (`/bookings`) |
-|:----------------------------------------------------:|:----------------------------------------------:|
-| <img src="docs/screenshots/rental_booking.png" alt="Equipment Rental Reservation" width="100%"> | <img src="docs/screenshots/bookings_portal.png" alt="Customer Bookings Management" width="100%"> |
+| Deep-Ocean Experience Reservation (`/explore/[id]`) | Unified Customer Bookings Portal (`/bookings`) |
+|:--------------------------------------------------:|:----------------------------------------------:|
+| <img src="docs/screenshots/experience_booking.png" alt="Experience Session Booking" width="100%"> | <img src="docs/screenshots/my_bookings.png" alt="Customer Bookings Portal" width="100%"> |
 
-| Partner Dashboard — Fleet & Session Control (`/partner/dashboard`) | Admin Governance & Moderation Queue (`/admin`) |
-|:-----------------------------------------------------------------:|:----------------------------------------------:|
-| <img src="docs/screenshots/partner_dashboard.png" alt="Partner Fleet and Sessions" width="100%"> | <img src="docs/screenshots/admin_dashboard.png" alt="Admin Moderation Queue" width="100%"> |
+| Customer Registration & Email Confirmation (`/account/signup`) | Hardened Password Reset via 8-Digit OTP (`/account/reset-password`) |
+|:-------------------------------------------------------------:|:-------------------------------------------------------------------:|
+| <img src="docs/screenshots/account_signin.png" alt="Customer Registration and Email Confirmation" width="100%"> | <img src="docs/screenshots/password_change_otp.png" alt="Password Reset via 8-Digit OTP" width="100%"> |
+
 
 ------------------------------------------------------------------------
 
@@ -52,15 +54,16 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 
 | Feature | Description |
 |---|---|
-| **Dual-Video Scrolly Engine** | Custom RAF seek synchronizer rendering 24fps intra-iframe encoded video transitions across 7 oceanic depth zones with velocity-based bidirectional fast-forwarding and canvas gradient lighting. |
+| **Dual-Video Scrolly Engine** | Custom RAF seek synchronizer rendering 24fps intra-frame encoded passage transitions across 7 oceanic depth zones with velocity-based bidirectional fast-forwarding and CSS multi-stop gradient shading overlays. |
 | **Expedition Marketplace** | Full marine discovery index with category and difficulty filters (*Night Dives*, *Open Water*, *Wreck Exploration*), real-time session capacity inspection, and passenger reservations. |
 | **Fleet Equipment Rentals** | Date-interval rental calculator with dynamic duration math, automatic refundable security deposits, and concurrent fleet availability validation. |
 | **Technical Diving Gear Store** | Retail dive equipment catalog with stock quantity tracking, brand specifications, and a persistent cart backed by server-side price re-validation. |
+| **Time-Aware Bookings Portal** | Customer reservation hub (`/bookings`) with automated lifecycle tracking (*Confirmed*, *In Use / Active*, *Completed*, *Cancelled*), contextual re-booking links (*Book Again*, *Rent Again*), and priority sorting. |
 | **Multi-Tenant Partner Hub** | Dedicated operator portal for verified dive charters: listing CRUD, Supabase Storage multi-image uploader, departure session scheduler, and rental fleet inventory manager. |
 | **Admin Moderation & Governance** | Role-gated administration console to review partner applications, inspect listing submissions (`draft` $\rightarrow$ `pending` $\rightarrow$ `active`/`rejected`), and toggle live listing visibility. |
-| **Hardened Customer Accounts** | Supabase Auth SSR cookie synchronization via edge request proxy, profile management, active reservation cancellation, and anti-enumeration 8-digit email OTP recovery. |
+| **Hardened Customer Accounts** | Supabase Auth SSR cookie synchronization via edge request proxy, profile management, temporal cancellation date guards, and anti-enumeration 8-digit email OTP recovery. |
 
-> **Security & Transactional Integrity:** All mutations execute through **Next.js Server Actions** (`"use server"`) backed by PostgreSQL stored procedures (`PL/pgSQL`). Concurrency is protected via `SELECT ... FOR UPDATE` row-level locks on departure sessions and rental fleet units to eliminate overselling and race conditions. Completed customer order and booking trails are protected by `ON DELETE RESTRICT` schemas against partner or listing deletion.  
+> **Security & Transactional Integrity:** All mutations execute through **Next.js Server Actions** (`"use server"`) backed by PostgreSQL stored procedures (`PL/pgSQL`). Concurrency is protected via `SELECT ... FOR UPDATE` row-level locks on departure sessions and rental fleet units to serialize conflicting booking mutations and help prevent concurrent overbooking. Completed customer order and booking trails are protected by `ON DELETE RESTRICT` foreign keys against partner or listing deletion. Cancellation actions are validated against past departure dates and active rental periods.  
 > *Note on Checkout:* Order creation, server pricing calculation, and atomic inventory reduction are fully implemented; payment processing is connected to a simulated gateway for portfolio evaluation.
 
 ------------------------------------------------------------------------
@@ -73,13 +76,14 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 | **UI Library** | **React 19.3.0** | Concurrent rendering, optimistic transitions, context-driven cart state, and custom hook synchronizers. |
 | **Type System** | **TypeScript 5.x** | Strict end-to-end type safety covering database schemas, RPC payload contracts, and component props. |
 | **Scrolly Engine** | **Dual `<video>` + RAF** | Bespoke 24fps seek synchronizer across dual buffers (`#videoA` & `#videoB`) with bidirectional fast-forwarding. |
-| **Graphics & Audio** | **Canvas 2D + Web Audio** | Dynamic ambient gradient sampling, responsive letterboxing, and spatial audio ducking cross-fades. |
+| **Graphics & Audio** | **CSS Overlays & Web Audio** | Multi-stop linear gradient shading, blur-filter atmospheric glow, and Web Audio API spatial ducking cross-fades. |
 | **Styling Architecture** | **Vanilla CSS & Glassmorphism** | Zero-runtime CSS custom properties, backdrop blur filters, fluid typography, and hardware-accelerated transforms. |
 | **Database & RPCs** | **Supabase (PostgreSQL)** | Relational integrity, `ON DELETE RESTRICT` schemas, and atomic stored procedures with `SELECT ... FOR UPDATE` locks. |
 | **Auth & Edge Security** | **Supabase Auth SSR** | Edge request proxy (`proxy.ts`), cookie-based session hydration, multi-role RBAC (`admin`/`partner`/`customer`), and 8-digit OTP. |
 | **Object Storage** | **Supabase Storage** | Public `listing-images` bucket for partner media staging, multi-file uploads, and secure asset hosting. |
-| **Testing Suite** | **Vitest 3.x** | 49 automated unit tests validating rental duration math, pricing calculations, and security sanitization. |
+| **Testing Suite** | **Vitest 3.2.7** | 72 automated unit tests validating rental duration math, booking lifecycle transitions, pricing computations, and security sanitization. |
 | **Hosting & Platform** | **Vercel** | Global edge network, automated Turbopack builds, serverless function isolation, and edge cookie proxying. |
+
 
 ------------------------------------------------------------------------
 
@@ -153,24 +157,31 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="your-supabase-publishable-key"
 
 ### 4. Database setup & migrations
 
-The database schema, stored procedures, and Row Level Security policies are maintained as 9 sequential SQL migrations in `supabase/migrations/`:
+The database schema, stored procedures, and Row Level Security policies are maintained as sequential SQL migrations in `supabase/migrations/` (`001` through `009`):
 
 ```
 supabase/migrations/
-├── 001_initial_schema.sql                      # Profiles, roles, listings, images, RLS
-├── 002_user_roles_read_policy.sql              # Role query policy permissions
-├── 003_orders_and_bookings.sql                 # Orders, order_items, rental & experience bookings
-├── 004_partner_listing_workflow.sql            # Draft -> Pending -> Active/Rejected lifecycle
-├── 005_fix_rls_infinite_recursion.sql          # is_admin() security definer function
-├── 006_drop_insecure_password_reset_rpc.sql    # Security hardening for Supabase Auth OTP
-├── 007_booking_concurrency_and_inventory.sql   # Atomic book_rental, book_experience & create_order RPCs
-├── 008_listing_identity_and_foreign_keys.sql   # ON DELETE RESTRICT historical record protection
-└── 009_experience_session_capacity_and_booking # Seat capacity enforcement in book_experience RPC
+├── 001_initial_schema.sql                          # Profiles, roles, listings, images, storage RLS
+├── 002_user_roles_read_policy.sql                  # Role query policy permissions
+├── 003_orders_and_bookings.sql                     # Orders, order_items, rental & experience bookings
+├── 004_partner_listing_workflow.sql                # Draft -> Pending -> Active/Rejected lifecycle
+├── 005_fix_rls_infinite_recursion.sql              # is_admin() security definer function
+├── 006_drop_insecure_password_reset_rpc.sql        # Security hardening for Supabase Auth OTP
+├── 007_booking_concurrency_and_inventory.sql       # Atomic book_rental, book_experience & create_order RPCs
+├── 008_listing_identity_and_foreign_keys.sql       # ON DELETE RESTRICT historical record protection
+└── 009_experience_session_capacity_and_booking.sql # Seat capacity enforcement in book_experience RPC
 ```
 
-Apply these migrations to your Supabase project using the Supabase CLI (`supabase db push`) or by executing the SQL files in order within the Supabase SQL Editor.
+> **Note on Migration Execution:** Migration files are versioned in source control and are not automatically executed against a live Supabase project. To initialize a new database, apply migrations `001` through `009` sequentially via the Supabase CLI (`supabase db push`) or execute them in order within the Supabase Dashboard SQL Editor (`000_delete_all.sql` is provided only as a reset utility).
 
-Ensure a public storage bucket named `listing-images` is created in your Supabase project for partner listing image uploads.
+* **Storage Bucket:** Ensure a public storage bucket named `listing-images` is created in your Supabase project (configured in `001_initial_schema.sql`) for partner listing media uploads.
+* **Auth Redirect:** In your Supabase Dashboard under Authentication $\rightarrow$ URL Configuration, add `http://localhost:3000/auth/callback` to the Allowed Redirect URLs.
+* **Role Configuration:** By default, new registrations receive the `customer` role. To assign an `admin` or `partner` role for local testing, insert a corresponding record into `public.user_roles`:
+  ```sql
+  INSERT INTO public.user_roles (user_id, role)
+  VALUES ('<your-user-uuid>', 'admin'); -- or 'partner'
+  ```
+  Alternatively, operators can submit an application via `/partner/apply`, which an administrator can approve from the `/admin` console.
 
 ### 5. Run the application
 
@@ -178,7 +189,7 @@ Ensure a public storage bucket named `listing-images` is created in your Supabas
 # Start local development server (Turbopack enabled)
 npm run dev
 
-# Run automated Vitest test suite (49 tests passing)
+# Run automated Vitest test suite (72 tests passing)
 npm test
 
 # Build optimized production bundle
@@ -197,8 +208,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Project BLUE separates presentation, stateful media synchronization, and transactional persistence with strict boundaries.
 
 <p align="center">
-  <a href="docs/architecture/detailed_system_architecture.png" target="_blank">
-    <img src="docs/architecture/detailed_system_architecture.png" alt="Project BLUE System Architecture" width="100%">
+  <a href="docs/architecture/project_blue_architecture.png" target="_blank">
+    <img src="docs/architecture/project_blue_architecture.png" alt="Project BLUE System Architecture" width="100%">
   </a>
   <br>
   <em>💡 Tip: Click the image above to view it in full resolution.</em>
@@ -211,7 +222,7 @@ Project BLUE separates presentation, stateful media synchronization, and transac
 | **App Router & Pages** | `src/app/` | Server-rendered pages (`/`, `/explore`, `/gear`, `/rentals`, `/bookings`, `/partner`, `/admin`) and Server Actions (`actions.ts`). |
 | **Auth Callback Handler** | `src/app/auth/callback/route.ts` | The only Route Handler in the project; handles Supabase Auth OTP verification and code exchange. |
 | **Edge Request Proxy** | `src/proxy.ts` | Edge session refresh handler and cookie forwarder protecting authenticated `/admin` and `/partner` routes. |
-| **Scrollytelling Engine** | `public/assets/scrollytelling.js` | Dual-buffer `<video>` orchestrator, RAF velocity tracker, canvas lighting, and audio ducking manager. |
+| **Scrollytelling Engine** | `public/assets/scrollytelling.js` | Dual-buffer `<video>` orchestrator, RAF velocity tracker, CSS gradient shading overlays, and Web Audio ducking manager. |
 | **Scrolly Component** | `src/components/scrolly/` | React wrapper, brand header overlay, journey depth navigation dots, and interactive CTA card. |
 | **Marketplace Components** | `src/components/marketplace/` | Experience/Rental booking drawers, image gallery, difficulty filter pills, and product cards. |
 | **Partner Portal Client** | `src/components/partner/` | Comprehensive operational client: listing forms, image upload stager, session scheduler, and rental fleet controls. |
@@ -219,20 +230,20 @@ Project BLUE separates presentation, stateful media synchronization, and transac
 | **Cart State** | `src/components/cart/` | Client React Context with `localStorage` (`blue_cart_v1`) persistence and reactive nav counters. |
 | **Supabase SSR Clients** | `src/lib/supabase/` | Cookie-based Supabase client initializers for Server Components, Server Actions, and Browser Clients. |
 | **Authorization Utils** | `src/lib/auth/roles.ts` | Server-side role validation helpers (`isPartner`, `isAdmin`) verified directly against PostgreSQL roles. |
-| **Unit Test Suite** | `src/lib/utils/__tests__/` | 49 automated Vitest unit tests covering date math, pricing computations, input validation, and media URL sanitization. |
+| **Unit Test Suite** | `src/lib/utils/__tests__/` | 72 automated Vitest unit tests covering date math, booking lifecycle states, pricing computations, input validation, and media URL sanitization. |
 
 ### Video & Audio Scrollytelling Pipeline
 
-The scrollytelling engine synchronizes dual `<video>` buffers (`#videoA` and `#videoB`) with continuous requestAnimationFrame seeking. All video assets were preprocessed using custom Python/OpenCV optical flow scripts and encoded with **intra-iframe only** compression (`-g 1 -keyint_min 1 -bf 0`) to enable instantaneous, frame-accurate seeking at 24fps without decoding lag:
+The scrollytelling engine synchronizes dual `<video>` buffers (`#videoA` and `#videoB`) with continuous requestAnimationFrame seeking. Video assets were preprocessed using custom Python/OpenCV optical flow scripts. Scrubbed passage transitions are encoded with **intra-frame all-I-frame** compression (`-g 1 -keyint_min 1 -bf 0`) to enable instantaneous, 24fps frame-accurate seeking without decoding lag, while ambient loop videos use standard inter-frame GOP encoding (`-g 48 -keyint_min 48`) optimized for smooth continuous playback:
 
 | Stage | Name | Mode | Video Asset | Audio Sync Track | Atmosphere & Depth |
 |:---:|---|:---:|---|---|---|
 | **01** | **BLUE PLANET** | Loop | `V1Lrus_s36.mp4` | Ambient Hydrophone | Low Earth orbit looking down at the blue planet. |
-| **02** | **LAND IN SIGHT** | Passage | `V2Pds_s36cV3Pds.mp4` | Ambient Hydrophone | Atmospheric descent toward distant island and coastal waters. |
+| **02** | **ISLAND TO BEACH** *(Land in Sight)* | Passage | `V2Pds_s36cV3Pds.mp4` | Ambient Hydrophone | Atmospheric descent toward distant island and coastal waters. |
 | **03** | **BLUE HORIZON** | Loop | `V4Lds.mp4` | `V4LA.mp3` | Ocean surface swell and offshore blue water. |
-| **04** | **THE DESCENT** | Passage + Loop | `V5.00Pds.mp4` / `V5.14Lds.mp4` | `V5and8LA.mp3` | Surface break into sunlit subsurface water. |
-| **05** | **DIVE BOAT** | Loop | `V6Lds_s27.mp4` | `V6LA.mp3` | Mid-ocean dive boat expedition and prep. |
-| **06** | **CORAL DESCENT** | Passage | `V7Pds.mp4` | Ambient Hydrophone | Descent toward vibrant shallow and mid-depth coral reefs. |
+| **04** | **ENTERING THE OCEAN** *(The Descent)* | Passage + Loop + Passage | `V5.00Pds.mp4` / `V5.14Lds.mp4` / `V5.47Pds_s27.mp4` | `V5and8LA.mp3` | Surface break into sunlit subsurface water. |
+| **05** | **DIVE BOAT** *(The Expedition)* | Loop | `V6Lds_s27.mp4` | `V6LA.mp3` | Mid-ocean dive boat expedition and prep. |
+| **06** | **CORAL DESCENT** *(Below the Light)* | Passage | `V7Pds.mp4` | Ambient Hydrophone | Descent toward vibrant shallow and mid-depth coral reefs. |
 | **07** | **BLUE ABYSS** | Loop | `V8Lds_b.mp4` | `V5and8LA.mp3` | Deep ocean drop-off and benthic marine expanse. |
 
 ------------------------------------------------------------------------
@@ -250,9 +261,10 @@ flowchart LR
     D -->|Insufficient Capacity| F[Rollback & Return Error]
 ```
 
-* **Zero-Overselling Concurrency Protections:** Stored procedures `book_experience` and `book_rental` lock target departure sessions and rental fleet rows using `SELECT ... FOR UPDATE`, guaranteeing serial execution during concurrent customer reservations.
+* **Concurrent Booking Protections:** Stored procedures `book_experience` and `book_rental` lock target departure sessions and rental fleet rows using `SELECT ... FOR UPDATE`, serializing conflicting operations during concurrent customer reservations to prevent overbooking.
+* **Server-Side Temporal Cancellation Guards:** Cancellation Server Actions inspect booking dates and departure times against localized time prior to mutation, preventing cancellations for past expeditions or active rental periods.
 * **Trusted Server Pricing:** `processCheckoutAction` ignores client-submitted prices from `localStorage`. The server verifies listing IDs against live database records, calculates line totals and taxes server-side, and submits verified amounts to the atomic order RPC.
-* **Immutable Historical Records:** Foreign keys linking `listings` to `order_items`, `rental_bookings`, and `experience_bookings` enforce `ON DELETE RESTRICT`. Partners can archive offerings, but completed customer purchases and booking history remain permanently immutable.
+* **Protected Historical Records:** Foreign keys linking `listings` to `order_items`, `rental_bookings`, and `experience_bookings` enforce `ON DELETE RESTRICT`. Partners can archive offerings, but completed customer purchases and booking records cannot be cascade-deleted.
 * **RLS Recursion Guard:** PostgreSQL function `is_admin()` runs with `SECURITY DEFINER` and `SET search_path = public`, eliminating circular policy evaluations when inspecting `user_roles`.
 
 ------------------------------------------------------------------------
@@ -260,7 +272,7 @@ flowchart LR
 ## 🛠️ Troubleshooting
 
 ### Scrollytelling video is black or shows loading indicator
-* Ensure the video assets are present in [`public/assets/master/`](file:///c:/Users/viraj/Projects/blue-next/public/assets/master).
+* Ensure the video assets are present in [`public/assets/master/`](public/assets/master/).
 * Confirm your browser supports MP4 H.264 playback and that hardware acceleration is enabled.
 
 ### Database or booking RPC errors
@@ -277,7 +289,7 @@ Run the test suite directly to check output:
 ```bash
 npm test
 ```
-All 49 unit tests in `src/lib/utils/__tests__/` should pass cleanly.
+All 72 unit tests in `src/lib/utils/__tests__/` should pass cleanly.
 
 ------------------------------------------------------------------------
 
@@ -296,7 +308,7 @@ Please do not commit uncompressed raw video files, `.env` files, or production c
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [`LICENSE`](file:///c:/Users/viraj/Projects/blue-next/LICENSE) file for details.
+This project is licensed under the MIT License — see the [`LICENSE`](LICENSE) file for details.
 
 ------------------------------------------------------------------------
 
