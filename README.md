@@ -24,10 +24,7 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 
 ## 📽️ Demo
 
-<p align="center">
-  <video src="https://github.com/user-attachments/assets/ff4ad432-5958-4759-a9a3-7f29b2d8f0f2" controls width="100%">
-  </video>
-</p>
+https://github.com/user-attachments/assets/0d5fd35c-79e5-4922-b0b9-194f49311a25
 
 *A seamless 24fps scroll-driven descent across seven oceanic depth zones, transitioning into live charter reservations, fleet rentals, and retail checkout.*
 
