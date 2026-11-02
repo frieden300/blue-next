@@ -16,7 +16,7 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 ![Vitest](https://img.shields.io/badge/Vitest-3.2.7-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Try Project BLUE](#-try-project-blue) · [Developer Setup](#-developer-setup) · [Architecture & Scrollytelling Engine](#-architecture--scrollytelling-engine) · [Database & Integrity](#-database-design--integrity) · [Troubleshooting](#-troubleshooting)
+[Features](#-features) · [Tech Stack](#%EF%B8%8F-tech-stack) · [Try Project BLUE](#-try-project-blue) · [Developer Setup](#%E2%80%8D-developer-setup) · [Architecture & Scrollytelling Engine](#%EF%B8%8F-architecture--scrollytelling-engine) · [Database & Integrity](#-database-design--integrity) · [Troubleshooting](#%EF%B8%8F-troubleshooting)
 
 </div>
 
@@ -25,8 +25,8 @@ Built with Next.js, React 19, TypeScript, Supabase (PostgreSQL with Row Level Se
 ## 📽️ Demo
 
 <p align="center">
-  <!-- Demo GIF placeholder: drop recording at docs/demo.gif -->
-  <img src="docs/demo.gif" alt="Project BLUE Live Demo" width="100%">
+  <video src="https://github.com/user-attachments/assets/ff4ad432-5958-4759-a9a3-7f29b2d8f0f2" controls width="100%">
+  </video>
 </p>
 
 *A seamless 24fps scroll-driven descent across seven oceanic depth zones, transitioning into live charter reservations, fleet rentals, and retail checkout.*
@@ -203,7 +203,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ------------------------------------------------------------------------
 
-## 🏗️ Architecture & Scrollytelling Engine
+## ⚙️ Architecture & Scrollytelling Engine
 
 Project BLUE separates presentation, stateful media synchronization, and transactional persistence with strict boundaries.
 
